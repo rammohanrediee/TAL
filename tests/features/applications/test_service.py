@@ -6,7 +6,7 @@ from tal.features.applications.entities import Application
 from tal.features.applications.models import ApplicationStatus
 from tal.features.applications.schemas import ApplicationCreate
 from tal.features.applications.service import create_application
-
+from tal.features.auth.entities import User
 
 @pytest.mark.asyncio
 async def test_create_application_persists_application() -> None:
@@ -18,13 +18,16 @@ async def test_create_application_persists_application() -> None:
 
     try:
         async with session_factory() as session:
+            owner=User(email="owner@example.com")
+            session.add(owner)
+            await session.flush()
             payload = ApplicationCreate(
                 company_name="OpenAI",
                 role_title="Backend Engineer",
                 job_url="https://openai.com",
             )
 
-            result = await create_application(payload, session)
+            result = await create_application(payload, session,owner.id)
             stored_application = await session.get(Application, result.id)
 
             assert result.company_name == "OpenAI"

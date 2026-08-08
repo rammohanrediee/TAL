@@ -13,29 +13,35 @@ from tal.features.applications.schemas import (
 from tal.features.applications.service import create_application as create_application_service
 from tal.features.applications.service import get_application, update_application_status
 from tal.features.applications.service import list_applications as list_application_service
-
+from tal.features.auth.dependencies import get_current_user
+from tal.features.auth.entities import User
 router = APIRouter(prefix="/applications")
 
 
 @router.post("/", response_model=ApplicationRead)
 async def create_application(
-    payload: ApplicationCreate, session: Annotated[AsyncSession, Depends(get_db_session)]
+    payload: ApplicationCreate,
+    session: Annotated[AsyncSession,   Depends(get_db_session)],
+    current_user: Annotated[User, Depends(get_current_user)]
 ) -> ApplicationRead:
-    return await create_application_service(payload, session)
+    return await create_application_service(payload, session,current_user.id)
 
 
 @router.get("/", response_model=list[ApplicationRead])
 async def list_applications(
     session: Annotated[AsyncSession, Depends(get_db_session)],
+    current_user: Annotated[User, Depends(get_current_user)]
 ) -> list[ApplicationRead]:
-    return await list_application_service(session)
+    return await list_application_service(session,current_user.id)
 
 
 @router.get("/{application_id}", response_model=ApplicationRead)
 async def get_applications_id(
-    application_id: UUID, session: Annotated[AsyncSession, Depends(get_db_session)]
+    application_id: UUID,
+      session: Annotated[AsyncSession, Depends(get_db_session)],
+        current_user: Annotated[User, Depends(get_current_user)]
 ) -> ApplicationRead:
-    return await get_application(application_id, session)
+    return await get_application(application_id, session,current_user.id)
 
 
 @router.patch("/{id}/status", response_model=ApplicationRead)
@@ -43,5 +49,6 @@ async def patch_application_status(
     id: UUID,
     payload: ApplicationStatusUpdate,
     session: Annotated[AsyncSession, Depends(get_db_session)],
+    current_user: Annotated[User, Depends(get_current_user)]
 ) -> ApplicationRead:
-    return await update_application_status(id, payload, session)
+    return await update_application_status(id, payload, session,current_user.id)

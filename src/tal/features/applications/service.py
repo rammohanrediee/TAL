@@ -12,9 +12,10 @@ from tal.features.applications.schemas import (
 )
 
 
-async def create_application(payload: ApplicationCreate, session: AsyncSession) -> ApplicationRead:
+async def create_application(payload: ApplicationCreate, session: AsyncSession, user_id: UUID) -> ApplicationRead:
     data = payload.model_dump()
     data["job_url"] = str(payload.job_url) if payload.job_url else None
+    data["user_id"] = user_id
     application = Application(**data)
     session.add(application)
     await session.commit()
@@ -22,8 +23,8 @@ async def create_application(payload: ApplicationCreate, session: AsyncSession) 
     return ApplicationRead.model_validate(application)
 
 
-async def list_applications(session: AsyncSession) -> list[ApplicationRead]:
-    result = await session.execute(select(Application))
+async def list_applications(session: AsyncSession,user_id: UUID) -> list[ApplicationRead]:
+    result = await session.execute(select(Application).where(Application.user_id == user_id))
     applications = result.scalars().all()
     return [ApplicationRead.model_validate(application) for application in applications]
 
@@ -31,17 +32,27 @@ async def list_applications(session: AsyncSession) -> list[ApplicationRead]:
 async def get_application(
     application_id: UUID,
     session: AsyncSession,
+    user_id: UUID
 ) -> ApplicationRead:
-    application = await session.get(Application, application_id)
+    result = await session.execute(
+        select(Application).where(Application.id == application_id, Application.user_id == user_id)
+    )
+    application = result.scalar_one_or_none()
     if application is None:
         raise ApplicationNotFoundError(application_id)
     return ApplicationRead.model_validate(application)
 
 
 async def update_application_status(
-    id: UUID, payload: ApplicationStatusUpdate, session: AsyncSession
+    id: UUID,
+    payload: ApplicationStatusUpdate,
+    session: AsyncSession,
+    user_id: UUID
 ) -> ApplicationRead:
-    application = await session.get(Application, id)
+    result= await session.execute(
+        select(Application).where(Application.id == id, Application.user_id == user_id)
+    )
+    application = result.scalar_one_or_none()
     if application is None:
         raise ApplicationNotFoundError(id)
     application.status = payload.status
