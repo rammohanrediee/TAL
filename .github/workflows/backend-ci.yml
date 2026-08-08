@@ -15,17 +15,17 @@ jobs:
   backend-tests:
     runs-on: ubuntu-latest
     env:
-      DATABASE_URL: sqlite+aiosqlite:///:memory:
-      JWT_SECRET_KEY: ci-only-jwt-secret
-      GOOGLE_CLIENT_ID: ci-only-google-client-id
-      GOOGLE_CLIENT_SECRET: ci-only-google-client-secret
-      GOOGLE_REDIRECT_URI: http://localhost:8000/api/v1/auth/google/callback
-      R2_ACCOUNT_ID: ci-only-r2-account-id
-      R2_ACCESS_KEY_ID: ci-only-r2-access-key-id
-      R2_SECRET_ACCESS_KEY: ci-only-r2-secret-access-key
-      R2_BUCKET_NAME: ci-only-r2-bucket
-      R2_ENDPOINT_URL: https://example.invalid
-      OAUTH_STATE_SECRET: ci-only-oauth-state-secret
+      DATABASE_URL: "sqlite+aiosqlite:///:memory:"
+      JWT_SECRET_KEY: "ci-only-jwt-secret"
+      GOOGLE_CLIENT_ID: "ci-only-google-client-id"
+      GOOGLE_CLIENT_SECRET: "ci-only-google-client-secret"
+      GOOGLE_REDIRECT_URI: "http://localhost:8000/api/v1/auth/google/callback"
+      R2_ACCOUNT_ID: "ci-only-r2-account-id"
+      R2_ACCESS_KEY_ID: "ci-only-r2-access-key-id"
+      R2_SECRET_ACCESS_KEY: "ci-only-r2-secret-access-key"
+      R2_BUCKET_NAME: "ci-only-r2-bucket"
+      R2_ENDPOINT_URL: "https://example.invalid"
+      OAUTH_STATE_SECRET: "ci-only-oauth-state-secret"
 
     steps:
       - name: Check out repository
