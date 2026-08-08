@@ -19,6 +19,14 @@ class StorageBackend(Protocol):
         """Store one private résumé object."""
         ...
 
+    async def delete(
+        self,
+        *,
+        storage_key: str,
+    ) -> None:
+        """Delete one private résumé object."""
+        ...
+
 
 class R2StorageBackend:
     def __init__(
@@ -43,6 +51,17 @@ class R2StorageBackend:
             Key=storage_key,
             Body=data,
             ContentType=content_type,
+        )
+
+    async def delete(
+        self,
+        *,
+        storage_key: str,
+    ) -> None:
+        await asyncio.to_thread(
+            self._client.delete_object,
+            Bucket=self._bucket_name,
+            Key=storage_key,
         )
 
 

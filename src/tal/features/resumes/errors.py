@@ -35,3 +35,10 @@ class InvalidResumeFilenameError(DomainError):
             message="The résumé filename is missing or invalid.",
             status_code=400,
         )
+
+class ResumeNotFoundError(DomainError):
+    def __init__(self):
+        super().__init__(
+            code="resume_not_found",
+            message="Resume not found",
+            status_code=404)

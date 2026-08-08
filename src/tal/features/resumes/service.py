@@ -4,6 +4,7 @@ from uuid import UUID, uuid4
 from zipfile import BadZipFile, ZipFile
 
 from fastapi import UploadFile
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from tal.core.config import get_settings
@@ -11,6 +12,7 @@ from tal.features.resumes.entities import Resume
 from tal.features.resumes.errors import (
     EmptyResumeError,
     InvalidResumeFilenameError,
+    ResumeNotFoundError,
     ResumeTooLargeError,
     UnsupportedResumeTypeError,
 )
@@ -86,6 +88,9 @@ async def create_resume_from_upload(
         f"users/{user_id}/resumes/"
         f"{resume_id}{extension}"
     )
+    if (not original_filename.lower().endswith(extension) or 
+    file.content_type!=detected_content_type):
+        raise UnsupportedResumeTypeError()
 
     resume=Resume(
         id=resume_id,
@@ -115,3 +120,23 @@ async def create_resume_from_upload(
     await session.refresh(resume)
 
     return ResumeRead.model_validate(resume)
+
+
+async def  delete_resume(
+        resume_id:UUID,
+        user_id:UUID,
+        session:AsyncSession,
+        storage:StorageBackend
+)->None:
+    result=await session.execute(
+        select(Resume).where(
+            Resume.user_id==user_id,
+              Resume.id==resume_id)
+            )
+    resume=result.scalar_one_or_none()
+    if resume is None:
+        raise ResumeNotFoundError()
+
+    await storage.delete(storage_key=resume.storage_key)
+    await session.delete(resume)
+    await session.commit()
