@@ -23,6 +23,7 @@ dependencies = [
   "PyJWT>=2.10,<3",
   "authlib>=1.6,<2",
   "itsdangerous>=2.2,<3",
+  "boto3>=1.35,<2",
 
 ]
 

@@ -1,16 +1,25 @@
 from datetime import UTC, datetime
 from uuid import UUID, uuid4
 
-from sqlalchemy import DateTime, String, Uuid
+from sqlalchemy import DateTime, String, Uuid,ForeignKey
 from sqlalchemy import Enum as SqlEnum
 from sqlalchemy.orm import Mapped, mapped_column
-
 from tal.db.base import Base
 from tal.features.applications.models import ApplicationStatus
 
 
 class Application(Base):
     __tablename__ = "applications"
+
+    user_id: Mapped[UUID] = mapped_column(
+    Uuid,
+    ForeignKey(
+        "users.id",
+        name="fk_applications_user_id_users",
+        ondelete="CASCADE",
+    ),
+    nullable=False,
+    index=True,)
 
     id: Mapped[UUID] = mapped_column(
         Uuid,
