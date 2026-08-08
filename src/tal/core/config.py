@@ -3,7 +3,6 @@ from functools import lru_cache
 from pydantic import SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
         env_file=".env",
@@ -25,8 +24,13 @@ class Settings(BaseSettings):
     google_client_id: SecretStr
     google_client_secret: SecretStr
     google_redirect_uri: str
-
+    r2_account_id: str
+    r2_access_key_id: SecretStr
+    r2_secret_access_key: SecretStr
+    r2_bucket_name: str
+    r2_endpoint_url: str
     oauth_state_secret: SecretStr
+    resume_max_upload_bytes: int = 5 * 1024 * 1024
 
 
 

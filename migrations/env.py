@@ -6,6 +6,7 @@ from tal.features.auth import entities as auth_entities  # noqa: F401
 from tal.core.config import settings
 from tal.db.base import Base
 from tal.features.applications import entities  # noqa: F401
+from tal.features.resumes import entities as resume_entities  # noqa: F401
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
