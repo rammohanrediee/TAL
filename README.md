@@ -11,6 +11,15 @@ workloads.
 > **Project status:** Active development. Authentication and the initial application
 > tracker are implemented. The web interface is currently under construction.
 
+## Project documents
+
+- [`PROJECT_BLUEPRINT.md`](PROJECT_BLUEPRINT.md) — product behavior, safety boundaries, and
+  ordered delivery plan
+- [`ARCHITECTURE.md`](ARCHITECTURE.md) — system boundaries, data flows, authentication,
+  storage, workers, and applied-AI design
+- [`PRODUCTION.md`](PRODUCTION.md) — deployment, security, reliability, observability,
+  recovery, privacy, and release gates
+
 ## Current capabilities
 
 ### Backend

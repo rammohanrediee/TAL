@@ -1,5 +1,9 @@
 # TAL Applied AI Job-Search Copilot — Project Blueprint
 
+Technical boundaries and the production operating baseline are defined separately in
+[`ARCHITECTURE.md`](ARCHITECTURE.md) and [`PRODUCTION.md`](PRODUCTION.md). This blueprint
+remains the product behavior and ordered-delivery source of truth.
+
 ## Product statement
 
 TAL is an Applied AI job-search copilot. A user uploads a résumé, confirms a
@@ -139,6 +143,50 @@ Configured companies
 3. Add Lever using the same provider contract.
 4. Add Ashby after the contract is stable.
 5. Add other legitimate sources only when they provide measurable coverage value.
+
+### Career-Ops patterns to adopt
+
+Use [Career-Ops](https://github.com/santifer/career-ops) as a reference for discovery
+workflow ideas, not as TAL's production architecture. Copy and adapt these patterns:
+
+- A configured company registry rather than an unrestricted crawl of the web
+- One provider contract with Greenhouse, Lever, Ashby, and future implementations
+- Structured public ATS feeds or JSON APIs as the first and cheapest extraction path
+- A shared pipeline for normalization, deduplication, freshness, and liveness
+- Human review and a clear boundary against automatic application submission
+- Browser automation as a narrow fallback, not the default job collector
+
+Process a user-provided job URL through the following ordered strategy:
+
+```text
+validate public URL and redirects
+→ use a known ATS provider adapter when possible
+→ otherwise fetch with bounded ordinary HTTP
+→ extract JSON-LD or readable job-description HTML
+→ use Playwright only when required content is JavaScript-rendered
+→ clean and normalize untrusted text
+→ extract schema-constrained requirements
+→ apply deterministic eligibility and matching
+```
+
+The Playwright fallback must run asynchronously in an isolated worker, not inside the
+FastAPI request process. It requires strict navigation, redirect, DNS/IP, time, response-size,
+browser-memory, and concurrency limits. It must block private-network destinations, close
+each browser context after use, and emit observable failure reasons. Cache a successful
+public observation so multiple users do not render the same page independently.
+
+Do not copy these behaviors into TAL:
+
+- Playwright-first browsing for every job URL
+- Unrestricted agent-controlled navigation
+- Bypassing authentication, CAPTCHAs, access controls, or portal restrictions
+- Sending an unvalidated URL directly to an AI model and trusting its response
+- Letting AI invent eligibility facts or directly choose the final numeric rating
+- Automatic form filling or application submission in the MVP
+
+Playwright may later be reused in a separate rendering workflow for ATS-readable PDF
+exports and in the test suite for browser-level end-to-end tests. Those uses remain
+separate from the job-requirement extraction and scoring responsibilities.
 
 TAL does not need credentials for every job portal. Prefer public ATS feeds and
 approved company career pages. Do not bypass logins, CAPTCHAs, access controls, or
