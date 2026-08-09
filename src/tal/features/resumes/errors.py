@@ -42,3 +42,26 @@ class ResumeNotFoundError(DomainError):
             code="resume_not_found",
             message="Resume not found",
             status_code=404)
+
+
+class ResumeTextNotFoundError(DomainError):
+    def __init__(self) -> None:
+        super().__init__(
+            code="resume_text_not_found",
+            message=(
+                "No extractable text was found. "
+                "Upload a text-based PDF or DOCX."
+            ),
+            status_code=422,
+        )
+
+class ResumeExtractionError(DomainError):
+    def __init__(self) -> None:
+        super().__init__(
+            code="resume_extraction_failed",
+            message=(
+                "The résumé could not be read. "
+                "Upload a valid PDF or DOCX."
+            ),
+            status_code=422,
+        )
