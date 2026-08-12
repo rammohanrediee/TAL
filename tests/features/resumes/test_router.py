@@ -15,9 +15,9 @@ from tal.db.base import Base
 from tal.db.session import get_db_session
 from tal.features.auth.dependencies import get_current_user
 from tal.features.auth.entities import User
-from tal.features.resumes.entities import Resume  # Registers table metadata
 from tal.features.resumes.storage import get_resume_storage
 from tal.main import app
+from tal.worker.tasks import resumes as resume_tasks
 
 
 class FakeStorage:
@@ -47,9 +47,28 @@ class FakeStorage:
         self.deletions.append(storage_key)
 
 
+
 @pytest.fixture
 def fake_storage() -> FakeStorage:
     return FakeStorage()
+
+
+@pytest.fixture(autouse=True)
+def queued_resume_ids(
+    monkeypatch: pytest.MonkeyPatch,
+) -> list[str]:
+    resume_ids: list[str] = []
+
+    def fake_delay(resume_id: str) -> None:
+        resume_ids.append(resume_id)
+
+    monkeypatch.setattr(
+        resume_tasks.process_resume_task,
+        "delay",
+        fake_delay,
+    )
+
+    return resume_ids
 
 
 test_engine = create_async_engine("sqlite+aiosqlite:///:memory:")
@@ -91,6 +110,64 @@ async def client(
 
     app.dependency_overrides.clear()
     await test_engine.dispose()
+
+
+@pytest.fixture
+async def other_user(
+    client: TestClient,
+) -> User:
+    async with TestSessionFactory() as session:
+        user = User(email="other-resume-user@example.com")
+        session.add(user)
+        await session.commit()
+        await session.refresh(user)
+
+        return user
+
+
+
+def test_get_resume_hides_foreign_owned_resume(
+        client:TestClient,
+        other_user:User,
+)->None:
+    upload_response=client.post(
+        "/api/v1/resumes/",
+        files={
+            "file":(
+                 "resume.pdf",
+                b"%PDF-1.4\nprivate resume content",
+                "application/pdf",
+            )
+        },
+    )
+    assert upload_response.status_code==201
+    resume_id=upload_response.json()["id"]
+
+    owner_override=app.dependency_overrides[get_current_user]
+
+    async def override_get_current_user()->User:
+        return other_user
+
+    app.dependency_overrides[
+        get_current_user
+    ]=override_get_current_user
+
+    try:
+        response=client.get(
+            f"/api/v1/resumes/{resume_id}"
+        )
+    finally:
+        app.dependency_overrides[
+            get_current_user
+        ]=owner_override
+
+    data=response.json()
+
+    assert response.status_code==404
+    assert data["code"]=="resume_not_found"
+
+
+
 
 
 def test_upload_pdf_creates_resume(
@@ -279,3 +356,51 @@ def test_delete_resume_removes_stored_object(
 
     assert delete_response.status_code == 204
     assert fake_storage.deletions == [storage_key]
+
+
+
+def test_successful_upload_queues_resume_processing(
+    client: TestClient,
+    queued_resume_ids: list[str],
+) -> None:
+    pdf_bytes = b"%PDF-1.4\nsample resume content"
+
+    response = client.post(
+        "/api/v1/resumes/",
+        files={
+            "file": (
+                "resume.pdf",
+                pdf_bytes,
+                "application/pdf",
+            )
+        },
+    )
+    data = response.json()
+
+    assert response.status_code == 201
+    assert queued_resume_ids == [data["id"]]
+
+
+def test_get_resume_returns_status_for_owner(
+    client: TestClient,
+) -> None:
+    upload_response = client.post(
+        "/api/v1/resumes/",
+        files={
+            "file": (
+                "resume.pdf",
+                b"%PDF-1.4\nsample resume content",
+                "application/pdf",
+            )
+        },
+    )
+    resume_id = upload_response.json()["id"]
+
+    response = client.get(
+        f"/api/v1/resumes/{resume_id}"
+    )
+    data = response.json()
+
+    assert response.status_code == 200
+    assert data["id"] == resume_id
+    assert data["status"] == "uploaded"

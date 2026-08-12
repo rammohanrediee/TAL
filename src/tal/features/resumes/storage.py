@@ -19,6 +19,15 @@ class StorageBackend(Protocol):
         """Store one private résumé object."""
         ...
 
+    async def download(
+    self,
+    *,
+    storage_key: str,
+) -> bytes:
+
+        """Read one private résumé object."""
+        ...
+
     async def delete(
         self,
         *,
@@ -52,6 +61,27 @@ class R2StorageBackend:
             Body=data,
             ContentType=content_type,
         )
+
+    async def download(
+            self,
+            *,
+            storage_key:str,
+    )->bytes:
+        def download_object()->bytes:
+            response=self._client.get_object(
+                Bucket=self._bucket_name,
+                Key=storage_key,
+            )
+            body=response["Body"]
+
+            try:
+                data:bytes=body.read()
+                return data
+            finally:
+                body.close()
+        return await asyncio.to_thread(download_object)
+
+
 
     async def delete(
         self,

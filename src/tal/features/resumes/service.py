@@ -46,8 +46,8 @@ def _detect_resume_type(data:bytes)->tuple[str,str]:
     try:
         with ZipFile(BytesIO(data)) as archive:
             filenames=set(archive.namelist())
-    except(BadZipFile,OSError):
-        raise UnsupportedResumeTypeError()
+    except (BadZipFile, OSError):
+        raise UnsupportedResumeTypeError() from None
 
     required_docx_file={
           "[Content_Types].xml",
@@ -118,6 +118,25 @@ async def create_resume_from_upload(
         await session.rollback()
         raise
     await session.refresh(resume)
+
+    return ResumeRead.model_validate(resume)
+
+
+
+async def get_resume_by_id(
+        resume_id:UUID,
+        user_id:UUID,
+        session:AsyncSession,
+)->ResumeRead:
+    result=await session.execute(
+        select(Resume).where(
+            Resume.id==resume_id,
+            Resume.user_id==user_id,
+        )
+    )
+    resume=result.scalar_one_or_none()
+    if resume is None:
+        raise ResumeNotFoundError()
 
     return ResumeRead.model_validate(resume)
 
