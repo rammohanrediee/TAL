@@ -1,7 +1,7 @@
 from typing import Annotated, cast
 
 from authlib.integrations.base_client.errors import OAuthError  # type: ignore[import-untyped]
-from fastapi import APIRouter, Depends, Request, status
+from fastapi import APIRouter, Depends, Request, Response, status
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.ext.asyncio import AsyncSession
 from starlette.responses import RedirectResponse
@@ -12,16 +12,11 @@ from tal.features.auth.dependencies import get_current_user
 from tal.features.auth.entities import User
 from tal.features.auth.errors import InvalidCredentialsError
 from tal.features.auth.oauth import oauth
-from tal.features.auth.schemas import (
-    GoogleIdentityRead,
-    TokenResponse,
-    UserRead,
-    UserRegister,
-)
+from tal.features.auth.schemas import TokenResponse, UserRead, UserRegister
 from tal.features.auth.security import create_access_token
-from tal.features.auth.service import authenticate_user,get_or_create_external_user
+from tal.features.auth.service import authenticate_user, get_or_create_external_user
 from tal.features.auth.service import register as register_service
-from fastapi import Request,Response,status
+
 router = APIRouter(prefix="/auth")
 
 
@@ -67,9 +62,11 @@ async def google_login(request: Request) -> RedirectResponse:
     )
 
 
-@router.get("/google/callback", response_model=TokenResponse)
-async def google_callback(request: Request,
-                          response:Response,session:Annotated[AsyncSession,Depends(get_db_session),],) -> TokenResponse:
+@router.get("/google/callback")
+async def google_callback(
+    request: Request,
+    session: Annotated[AsyncSession, Depends(get_db_session)],
+) -> RedirectResponse:
     google = oauth.create_client("google")
     if google is None:
         raise RuntimeError("Google OAuth client is not configured")
@@ -85,34 +82,35 @@ async def google_callback(request: Request,
     email_verified = user_info.get("email_verified")
     if not provider_user_id or not email or email_verified is not True:
         raise InvalidCredentialsError()
-    user=await get_or_create_external_user(
+    user = await get_or_create_external_user(
         provider="google",
         provider_subject=provider_user_id,
         email=email,
         session=session,
     )
-    tal_acess_token=create_access_token(user.id)
-    response.set_cookie(
-    key="tal_access_token",
-    value=tal_acess_token,
-    httponly=True,
-    secure=True,
-    samesite="lax",
-    path="/",
-    max_age=settings.access_token_expire_minutes * 60,
-
+    tal_access_token = create_access_token(user.id)
+    redirect_response = RedirectResponse(
+        url=settings.frontend_url,
+        status_code=status.HTTP_303_SEE_OTHER,
     )
-    return TokenResponse(
-        access_token=tal_acess_token
+    redirect_response.set_cookie(
+        key="tal_access_token",
+        value=tal_access_token,
+        httponly=True,
+        secure=settings.app_env == "production",
+        samesite="lax",
+        path="/",
+        max_age=settings.access_token_expire_minutes * 60,
     )
+    return redirect_response
 
 
-@router.post("/logout",status_code=status.HTTP_204_NO_CONTENT)
-async def logout(response:Response)->None:
+@router.post("/logout", status_code=status.HTTP_204_NO_CONTENT)
+async def logout(response: Response) -> None:
     response.delete_cookie(
         key="tal_access_token",
         path="/",
-        secure=True,
+        secure=settings.app_env == "production",
         httponly=True,
-        samesite="lax"
+        samesite="lax",
     )

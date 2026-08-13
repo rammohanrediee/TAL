@@ -3,6 +3,7 @@ from functools import lru_cache
 from pydantic import SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
         env_file=".env",
@@ -31,6 +32,7 @@ class Settings(BaseSettings):
     r2_endpoint_url: str
     oauth_state_secret: SecretStr
     resume_max_upload_bytes: int = 5 * 1024 * 1024
+    frontend_url: str = "http://localhost:3000/"
 
 
 

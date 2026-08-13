@@ -1,6 +1,7 @@
 from collections.abc import AsyncIterator
 
 import pytest
+from authlib.integrations.base_client.errors import OAuthError
 from fastapi.testclient import TestClient
 from sqlalchemy.ext.asyncio import (
     AsyncSession,
@@ -12,7 +13,7 @@ from tal.db.base import Base
 from tal.db.session import get_db_session
 from tal.features.auth.oauth import oauth
 from tal.main import app
-from authlib.integrations.base_client.errors import OAuthError
+
 
 @pytest.fixture
 async def client() -> AsyncIterator[TestClient]:
@@ -107,7 +108,7 @@ class FailingGoogleClient:
     async def authorize_access_token(self, _: object) -> dict[str, object]:
         raise OAuthError(error="access_denied")
 
-def test_google_callback_issues_tal_token(
+def test_google_callback_redirects_with_tal_session_cookie(
     client: TestClient,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -119,35 +120,38 @@ def test_google_callback_issues_tal_token(
             "name": "Buddy",
         }
     )
-    monkeypatch.setattr(oauth, "create_client", lambda _: google)
+    monkeypatch.setattr(
+        oauth,
+        "create_client",
+        lambda _: google,
+    )
 
     callback_response = client.get(
-        "/api/v1/auth/google/callback"
+        "/api/v1/auth/google/callback",
+        follow_redirects=False,
     )
 
-    assert callback_response.status_code == 200
-    set_cookie=callback_response.headers["set-cookie"].lower()
-    assert "tal_access_token" in set_cookie
+    assert callback_response.status_code == 303
+    assert (
+        callback_response.headers["location"]
+        == "http://localhost:3000/"
+    )
+
+    set_cookie = callback_response.headers["set-cookie"].lower()
+
+    assert "tal_access_token=" in set_cookie
     assert "httponly" in set_cookie
-    assert "secure" in set_cookie
     assert "samesite=lax" in set_cookie
     assert "path=/" in set_cookie
-    token_data = callback_response.json()
+    assert "secure" not in set_cookie
 
-    assert token_data["token_type"] == "bearer"
-    assert token_data["access_token"]
-
-    profile_response = client.get(
-        "/api/v1/auth/me",
-        headers={
-            "Authorization": (
-                f"Bearer {token_data['access_token']}"
-            )
-        },
-    )
+    profile_response = client.get("/api/v1/auth/me")
 
     assert profile_response.status_code == 200
-    assert profile_response.json()["email"] == "buddy@example.com"
+    assert (
+        profile_response.json()["email"]
+        == "buddy@example.com"
+    )
 
 
 def test_google_callback_rejects_unverified_email(
@@ -181,13 +185,14 @@ def test_me_accepts_access_token_cookie(client:TestClient,
     }
     )
     monkeypatch.setattr(oauth,"create_client",lambda _:google)
-    callback_response=client.get("/api/v1/auth/google/callback")
-    access_token=callback_response.json()["access_token"]
+    callback_response=client.get(
+        "/api/v1/auth/google/callback",
+        follow_redirects=False,
+    )
 
-    response=client.get(
-        "/api/v1/auth/me",
-        cookies={"tal_access_token":access_token},
-                )
+    assert callback_response.status_code == 303
+
+    response=client.get("/api/v1/auth/me")
     assert response.status_code==200
     assert response.json()["email"]=="cookie_@gmail.com"
 
@@ -198,7 +203,7 @@ def test_logout_clears_access_token_cookie(client:TestClient)->None:
     assert "tal_access_token" in set_cookie
     assert "max-age=0" in set_cookie
     assert "httponly" in set_cookie
-    assert "secure" in set_cookie
+    assert "secure" not in set_cookie
     assert "path=/" in set_cookie
 
 def test_google_callback_returns_same_tal_user(
@@ -214,28 +219,20 @@ def test_google_callback_returns_same_tal_user(
     )
     monkeypatch.setattr(oauth, "create_client", lambda _: google)
 
-    first_callback = client.get("/api/v1/auth/google/callback")
-    second_callback = client.get("/api/v1/auth/google/callback")
-
-    first_profile = client.get(
-        "/api/v1/auth/me",
-        headers={
-            "Authorization": (
-                f"Bearer {first_callback.json()['access_token']}"
-            )
-        },
+    first_callback = client.get(
+        "/api/v1/auth/google/callback",
+        follow_redirects=False,
     )
-    second_profile = client.get(
-        "/api/v1/auth/me",
-        headers={
-            "Authorization": (
-                f"Bearer {second_callback.json()['access_token']}"
-            )
-        },
-    )
+    first_profile = client.get("/api/v1/auth/me")
 
-    assert first_callback.status_code == 200
-    assert second_callback.status_code == 200
+    second_callback = client.get(
+        "/api/v1/auth/google/callback",
+        follow_redirects=False,
+    )
+    second_profile = client.get("/api/v1/auth/me")
+
+    assert first_callback.status_code == 303
+    assert second_callback.status_code == 303
     assert first_profile.json()["id"] == second_profile.json()["id"]
 
 
