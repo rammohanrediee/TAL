@@ -2,6 +2,7 @@ import asyncio
 from uuid import UUID
 
 from tal.db.session import SessionFactory, engine
+from tal.features.auth import entities as auth_entities  # noqa: F401  (registers the users table in Base.metadata)
 from tal.features.resumes.processing import process_resume
 from tal.features.resumes.storage import get_resume_storage
 from tal.worker.celery_app import celery_app
