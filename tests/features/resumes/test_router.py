@@ -10,7 +10,8 @@ from sqlalchemy.ext.asyncio import (
     async_sessionmaker,
     create_async_engine,
 )
-
+from tal.features.resumes import router as resume_router
+from tal.features.resumes.errors import ResumeExtractionError
 from tal.db.base import Base
 from tal.db.session import get_db_session
 from tal.features.auth.dependencies import get_current_user
@@ -404,3 +405,38 @@ def test_get_resume_returns_status_for_owner(
     assert response.status_code == 200
     assert data["id"] == resume_id
     assert data["status"] == "uploaded"
+
+def test_upload_succeeds_when_queue_and_inline_processing_fail(
+    client: TestClient,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def fail_to_queue(_: str) -> None:
+        raise RuntimeError("Redis unavailable")
+
+    async def fail_inline_processing(**_: object) -> None:
+        raise ResumeExtractionError()
+
+    monkeypatch.setattr(
+        resume_tasks.process_resume_task,
+        "delay",
+        fail_to_queue,
+    )
+    monkeypatch.setattr(
+        resume_router,
+        "process_resume",
+        fail_inline_processing,
+    )
+
+    response = client.post(
+        "/api/v1/resumes/",
+        files={
+            "file": (
+                "resume.pdf",
+                b"%PDF-1.4\nsample resume content",
+                "application/pdf",
+            )
+        },
+    )
+
+    assert response.status_code == 201
+    assert response.json()["status"] == "uploaded"
