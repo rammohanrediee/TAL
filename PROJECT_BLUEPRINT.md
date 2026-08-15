@@ -96,6 +96,39 @@ uploaded → processing → ready
 Exit gate: important profile claims can be traced to exact résumé text, ambiguous
 claims can be corrected, and unsupported claims are not silently accepted.
 
+### Post-MVP provenance enhancement
+
+If precise in-document highlighting or deeper audit tooling later requires character
+positions, add `start_offset` and `end_offset` relative to an immutable source-block
+version. The backend must compute and validate those offsets from the already verified
+verbatim source quote; model-supplied offsets are never authoritative. Source-block
+identity, exact source text, and page/paragraph locations remain sufficient for the
+validation MVP.
+
+### Post-MVP hybrid extraction optimization
+
+If extraction evaluations later show a meaningful cost, latency, or recall benefit,
+add deterministic extraction alongside model extraction:
+
+```text
+Résumé source blocks
+        ↓
+Deterministic extraction + model extraction/enrichment
+        ↓
+Merge and deduplicate candidates
+        ↓
+Apply the same provenance and schema validation
+```
+
+Deterministic extractors may identify high-confidence facts covered by versioned
+taxonomies or explicit patterns, such as canonical skill mentions. The model remains
+useful for contextual experience, project impact, achievements, and ambiguous meaning.
+Both routes must produce the same typed candidate contract, preserve their extractor
+and taxonomy versions, and pass the same backend provenance checks before persistence.
+Deterministically discovered claims never bypass validation. Introduce this hybrid
+path only after representative evaluations demonstrate an improvement over the
+single model-extraction path; it is not required for the validation MVP.
+
 ## Stage 2 — Candidate intent and eligibility preferences
 
 Outcome: TAL knows what the user wants without confusing preferences with skills.
@@ -223,8 +256,46 @@ Structured résumé evidence
              +
 Normalized job requirements
              ↓
-Eligibility → evidence matching → rating → explanation
+Early eligibility filters
+             ↓
+Exact/canonical matching + embedding retrieval
+             ↓
+Candidate requirement-to-evidence links
+             ↓
+Matching rules and late eligibility checks
+             ↓
+Deterministic rating → explanation
 ```
+
+### Core matching domain objects
+
+TAL's matching core is built around three separate, first-class objects:
+
+```text
+JobRequirement ↔ RequirementMatch ↔ ResumeEvidence
+```
+
+`ResumeEvidence` is a verified candidate claim. It stores the owning résumé, evidence
+type, extracted and corrected wording, confirmation status, confidence, normalized
+skill identity when applicable, and provenance through an immutable source block and
+verbatim source quote.
+
+`JobRequirement` is a source-grounded requirement extracted from a normalized job. It
+stores whether the requirement is required, preferred, or contextual; its category,
+original wording and source location, canonical identity when applicable, explicit
+constraints or importance, and extractor, taxonomy, and source versions.
+
+`RequirementMatch` records an evaluation-specific relationship between one
+`JobRequirement` and candidate `ResumeEvidence`. It stores the requirement and
+evidence identifiers, match type, optional retrieval similarity, satisfaction state,
+stable reason code, and matching-policy version. A positive direct, adjacent, or
+satisfied match must reference verified evidence. Missing or unresolved requirements
+may have no evidence identifier, but must retain their explicit state and reason.
+
+These objects remain distinct: source records preserve truth, retrieval proposes
+candidate relationships, and versioned matching policy decides satisfaction and score
+contribution. Embeddings may index `ResumeEvidence` and `JobRequirement`, but never
+replace either object or become the authority for `RequirementMatch`.
 
 ### Requirement extraction
 
@@ -237,13 +308,52 @@ Eligibility → evidence matching → rating → explanation
 
 ### Matching rules
 
-- Apply explicit hard eligibility gates before numeric scoring.
+- Split eligibility into early filters and late checks. Both phases run before numeric
+  scoring, but only the early phase runs before semantic retrieval.
+- Apply early filters using cheap, indexed, structured facts such as job liveness,
+  employment type, strict location/work-mode exclusions, compensation floors, and
+  explicit work-authorization or sponsorship conflicts. A preference is an early
+  filter only when the user marked it as a strict constraint; otherwise it contributes
+  to preference fit during scoring.
+- Run exact and canonical skill matching before embedding retrieval. Use embeddings to
+  retrieve the top candidate evidence for each remaining job requirement, never as the
+  final judgment or numeric match percentage.
+- Apply late eligibility checks when the decision depends on requirement-to-evidence
+  alignment, including required credentials, education, minimum experience, must-have
+  technical evidence, and domain experience.
+- Represent every eligibility decision as allowed, blocked, or unknown with a stable
+  reason code and the phase that produced it. Missing candidate or job information
+  remains unknown and must continue through the pipeline rather than being silently
+  filtered out.
+- Do not calculate a numeric rating for an explicitly blocked job. Unknown checks may
+  proceed to scoring, but the uncertainty must remain visible in results and
+  explanations.
 - Classify evidence as direct, adjacent, unsupported, or unknown.
 - Link every positive match claim to verified résumé evidence.
 - Do not convert adjacent experience into direct experience.
 - Treat missing information as unknown, not automatically negative.
 - Ensure exact skill identity; for example, Java must not match JavaScript.
 - Store the inputs and scoring-policy version for reproducibility.
+
+### Retrieval and scoring boundary
+
+Embedding similarity is a retrieval signal, not TAL's match percentage:
+
+```text
+Requirement embedding
+        ↓
+Retrieve relevant verified evidence
+        ↓
+Classify the candidate link with versioned matching rules
+        ↓
+Calculate the deterministic rating from accepted links and policy weights
+```
+
+Store similarity with the candidate link for evaluation and debugging, but never
+convert cosine similarity directly into a user-facing rating. The matching policy
+decides whether retrieved evidence is direct, adjacent, unsupported, or unknown and
+whether the requirement is satisfied, partial, missing, or unresolved. Only accepted,
+provenance-backed links may contribute positively to the deterministic rating.
 
 ### Rating boundary
 

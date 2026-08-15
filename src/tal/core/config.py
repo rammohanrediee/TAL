@@ -1,4 +1,5 @@
 from functools import lru_cache
+from typing import Literal
 
 from pydantic import SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -9,19 +10,18 @@ class Settings(BaseSettings):
         env_file=".env",
         env_file_encoding="utf-8",
         extra="ignore",
-        
     )
 
     app_name: str = "TAL"
     app_env: str = "development"
     app_debug: bool = False
     api_v1_prefix: str = "/api/v1"
-    database_url: str 
+    database_url: str
     redis_url: str = "redis://localhost:6379/0"
     secret_key: SecretStr = SecretStr("development-only-change-me")
     access_token_expire_minutes: int = 30
-    jwt_secret_key:SecretStr
-    jwt_algorithm:str="HS256"
+    jwt_secret_key: SecretStr
+    jwt_algorithm: str = "HS256"
     google_client_id: SecretStr
     google_client_secret: SecretStr
     google_redirect_uri: str
@@ -32,8 +32,11 @@ class Settings(BaseSettings):
     r2_endpoint_url: str
     oauth_state_secret: SecretStr
     resume_max_upload_bytes: int = 5 * 1024 * 1024
+    openai_api_key: SecretStr | None = None
     frontend_url: str = "http://localhost:3000/"
-
+    evidence_provider: Literal["openai", "ollama"] = "openai"
+    evidence_model: str = "gpt-5-mini"
+    ollama_base_url: str = "http://localhost:11434/v1"
 
 
 @lru_cache
