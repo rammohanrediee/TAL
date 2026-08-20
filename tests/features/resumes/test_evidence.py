@@ -18,11 +18,13 @@ from tal.features.resumes.entities import (
 from tal.features.resumes.errors import (
     EvidenceProvenanceError,
     EvidenceSourceMismatchError,
+    ResumeNotFoundError,
     ResumeTextNotFoundError,
 )
 from tal.features.resumes.evidence import (
     correct_resume_evidence,
     create_resume_evidence,
+    list_resume_evidence,
 )
 from tal.features.resumes.evidence_extraction import (
     extract_resume_evidence,
@@ -516,3 +518,32 @@ async def test_create_evidence_rejects_skill_unsupported_by_quote(
 
     result = await session.execute(select(ResumeEvidence))
     assert result.scalars().all() == []
+
+
+async def test_list_resume_evidence_hides_foreign_resume(
+    session: AsyncSession,
+) -> None:
+    # Arrange
+    owner = User(email="evidence-list-owner@example.com")
+    other_user = User(email="evidence-list-other@example.com")
+    session.add_all([owner, other_user])
+    await session.flush()
+
+    resume = Resume(
+        user_id=owner.id,
+        original_filename="private-resume.pdf",
+        content_type="application/pdf",
+        size_bytes=100,
+        storage_key="users/owner/resumes/private-resume.pdf",
+        sha256="l" * 64,
+    )
+    session.add(resume)
+    await session.flush()
+
+    # Act and Assert
+    with pytest.raises(ResumeNotFoundError):
+        await list_resume_evidence(
+            resume_id=resume.id,
+            user_id=other_user.id,
+            session=session,
+        )

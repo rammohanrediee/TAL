@@ -1,21 +1,26 @@
 from collections.abc import AsyncIterator
 from io import BytesIO
 from typing import Any
+from uuid import UUID
 from zipfile import ZipFile
 
 import pytest
 from fastapi.testclient import TestClient
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import (
     AsyncSession,
     async_sessionmaker,
     create_async_engine,
 )
-from tal.features.resumes import router as resume_router
-from tal.features.resumes.errors import ResumeExtractionError
+
 from tal.db.base import Base
 from tal.db.session import get_db_session
 from tal.features.auth.dependencies import get_current_user
 from tal.features.auth.entities import User
+from tal.features.resumes import router as resume_router
+from tal.features.resumes.entities import ResumeEvidence, ResumeTextBlock
+from tal.features.resumes.errors import ResumeExtractionError
+from tal.features.resumes.models import EvidenceStatus, EvidenceType
 from tal.features.resumes.storage import get_resume_storage
 from tal.main import app
 from tal.worker.tasks import resumes as resume_tasks
@@ -440,3 +445,303 @@ def test_upload_succeeds_when_queue_and_inline_processing_fail(
 
     assert response.status_code == 201
     assert response.json()["status"] == "uploaded"
+
+
+
+def test_inline_processing_injects_configured_evidence_extractor(
+    client: TestClient,
+    fake_storage: FakeStorage,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    evidence_extractor = object()
+    processing_calls: list[dict[str, object]] = []
+
+    def fail_to_queue(_: str) -> None:
+        raise RuntimeError("Redis unavailable")
+
+    async def capture_processing(**kwargs: object) -> None:
+        processing_calls.append(kwargs)
+
+    monkeypatch.setattr(
+        resume_tasks.process_resume_task,
+        "delay",
+        fail_to_queue,
+    )
+    monkeypatch.setattr(
+        resume_router,
+        "create_configured_evidence_extractor",
+        lambda: evidence_extractor,
+    )
+    monkeypatch.setattr(
+        resume_router,
+        "process_resume",
+        capture_processing,
+    )
+
+    response = client.post(
+        "/api/v1/resumes/",
+        files={
+            "file": (
+                "resume.pdf",
+                b"%PDF-1.4\nsample resume content",
+                "application/pdf",
+            )
+        },
+    )
+
+    assert response.status_code == 201
+    assert len(processing_calls) == 1
+
+    call = processing_calls[0]
+    assert call["resume_id"] == UUID(response.json()["id"])
+    assert call["storage"] is fake_storage
+    assert call["evidence_extractor"] is evidence_extractor
+
+
+async def test_get_resume_evidence_returns_owned_cited_evidence(
+    client: TestClient,
+) -> None:
+    # Arrange
+    upload_response = client.post(
+        "/api/v1/resumes/",
+        files={
+            "file": (
+                "resume.pdf",
+                b"%PDF-1.4\nPython and FastAPI",
+                "application/pdf",
+            )
+        },
+    )
+    resume_id = UUID(upload_response.json()["id"])
+
+    async with TestSessionFactory() as session:
+        block = ResumeTextBlock(
+            resume_id=resume_id,
+            ordinal=1,
+            text="Python and FastAPI",
+            page_number=1,
+        )
+        session.add(block)
+        await session.flush()
+
+        evidence = ResumeEvidence(
+            resume_id=resume_id,
+            source_block_id=block.id,
+            evidence_type=EvidenceType.SKILL,
+            status=EvidenceStatus.PENDING,
+            extracted_text="FastAPI",
+            source_text="Python and FastAPI",
+            confidence=0.95,
+            canonical_skill_key="fastapi",
+            canonical_skill_name="FastAPI",
+        )
+        session.add(evidence)
+        await session.commit()
+
+    # Act
+    response = client.get(
+        f"/api/v1/resumes/{resume_id}/evidence"
+    )
+
+    # Assert
+    assert response.status_code == 200
+
+    data = response.json()
+    assert len(data) == 1
+
+    returned_evidence = data[0]
+    assert returned_evidence.pop("created_at")
+    assert returned_evidence.pop("updated_at")
+    assert returned_evidence == {
+        "id": str(evidence.id),
+        "resume_id": str(resume_id),
+        "source_block_id": str(block.id),
+        "evidence_type": "skill",
+        "status": "pending",
+        "extracted_text": "FastAPI",
+        "corrected_text": None,
+        "confidence": 0.95,
+        "source_text": "Python and FastAPI",
+        "canonical_skill_key": "fastapi",
+        "canonical_skill_name": "FastAPI",
+        "skill_match_type": None,
+        "skill_taxonomy_version": None,
+    }
+
+def test_get_resume_evidence_hides_foreign_resume(
+    client: TestClient,
+    other_user: User,
+) -> None:
+    # Arrange
+    upload_response = client.post(
+        "/api/v1/resumes/",
+        files={
+            "file": (
+                "resume.pdf",
+                b"%PDF-1.4\nprivate evidence",
+                "application/pdf",
+            )
+        },
+    )
+    resume_id = upload_response.json()["id"]
+
+    owner_override = app.dependency_overrides[get_current_user]
+
+    async def override_get_current_user() -> User:
+        return other_user
+
+    app.dependency_overrides[
+        get_current_user
+    ] = override_get_current_user
+
+    try:
+        # Act
+        response = client.get(
+            f"/api/v1/resumes/{resume_id}/evidence"
+        )
+    finally:
+        app.dependency_overrides[
+            get_current_user
+        ] = owner_override
+
+    # Assert
+    assert response.status_code == 404
+    assert response.json()["code"] == "resume_not_found"
+
+
+async def test_correct_owned_evidence_preserves_original_claim(
+    client: TestClient,
+) -> None:
+    # Arrange
+    upload_response = client.post(
+        "/api/v1/resumes/",
+        files={
+            "file": (
+                "resume.pdf",
+                b"%PDF-1.4\nPython beginner",
+                "application/pdf",
+            )
+        },
+    )
+    resume_id = UUID(upload_response.json()["id"])
+
+    async with TestSessionFactory() as session:
+        block = ResumeTextBlock(
+            resume_id=resume_id,
+            ordinal=1,
+            text="Python beginner",
+            page_number=1,
+        )
+        session.add(block)
+        await session.flush()
+
+        evidence = ResumeEvidence(
+            resume_id=resume_id,
+            source_block_id=block.id,
+            evidence_type=EvidenceType.SKILL,
+            status=EvidenceStatus.PENDING,
+            extracted_text="Python beginner",
+            source_text="Python beginner",
+            confidence=0.80,
+        )
+        session.add(evidence)
+        await session.commit()
+
+    # Act
+    response = client.patch(
+        f"/api/v1/resumes/evidence/{evidence.id}",
+        json={
+            "corrected_text": "  Python backend development  ",
+        },
+    )
+
+    # Assert
+    data = response.json()
+
+    assert response.status_code == 200
+    assert data["status"] == "corrected"
+    assert data["extracted_text"] == "Python beginner"
+    assert data["corrected_text"] == "Python backend development"
+    assert data["source_text"] == "Python beginner"
+
+
+
+
+async def test_correct_evidence_hides_foreign_owned_evidence(
+    client: TestClient,
+    other_user: User,
+) -> None:
+    # Arrange
+    upload_response = client.post(
+        "/api/v1/resumes/",
+        files={
+            "file": (
+                "resume.pdf",
+                b"%PDF-1.4\nPrivate Python evidence",
+                "application/pdf",
+            )
+        },
+    )
+    resume_id = UUID(upload_response.json()["id"])
+
+    async with TestSessionFactory() as session:
+        block = ResumeTextBlock(
+            resume_id=resume_id,
+            ordinal=1,
+            text="Private Python evidence",
+            page_number=1,
+        )
+        session.add(block)
+        await session.flush()
+
+        evidence = ResumeEvidence(
+            resume_id=resume_id,
+            source_block_id=block.id,
+            evidence_type=EvidenceType.SKILL,
+            status=EvidenceStatus.PENDING,
+            extracted_text="Python",
+            source_text="Private Python evidence",
+            confidence=0.90,
+        )
+        session.add(evidence)
+        await session.commit()
+
+        evidence_id = evidence.id
+
+    owner_override = app.dependency_overrides[get_current_user]
+
+    async def override_get_current_user() -> User:
+        return other_user
+
+    app.dependency_overrides[
+        get_current_user
+    ] = override_get_current_user
+
+    try:
+        # Act
+        response = client.patch(
+            f"/api/v1/resumes/evidence/{evidence_id}",
+            json={
+                "corrected_text": "Malicious replacement",
+            },
+        )
+    finally:
+        app.dependency_overrides[
+            get_current_user
+        ] = owner_override
+
+    # Assert
+    assert response.status_code == 400
+    assert response.json()["code"] == "evidence_not_found"
+
+    async with TestSessionFactory() as session:
+        result = await session.execute(
+            select(ResumeEvidence).where(
+                ResumeEvidence.id == evidence_id,
+            )
+        )
+        unchanged_evidence = result.scalar_one()
+
+    assert unchanged_evidence.status is EvidenceStatus.PENDING
+    assert unchanged_evidence.corrected_text is None
+    assert unchanged_evidence.extracted_text == "Python"

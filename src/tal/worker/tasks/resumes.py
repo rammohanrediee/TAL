@@ -2,7 +2,12 @@ import asyncio
 from uuid import UUID
 
 from tal.db.session import SessionFactory, engine
-from tal.features.auth import entities as auth_entities  # noqa: F401  (registers the users table in Base.metadata)
+from tal.features.auth import (
+    entities as auth_entities,  # noqa: F401  (registers the users table in Base.metadata)
+)
+from tal.features.resumes.evidence_client_factory import (
+    create_configured_evidence_extractor,
+)
 from tal.features.resumes.processing import process_resume
 from tal.features.resumes.storage import get_resume_storage
 from tal.worker.celery_app import celery_app
@@ -17,6 +22,7 @@ async def run_resume_processing(
                 resume_id=resume_id,
                 session=session,
                 storage=get_resume_storage(),
+                evidence_extractor=create_configured_evidence_extractor(),
             )
     finally:
         await engine.dispose()

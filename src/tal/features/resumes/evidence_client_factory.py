@@ -3,9 +3,14 @@ from typing import Literal
 from openai import AsyncOpenAI
 from pydantic import SecretStr
 
+from tal.core.config import get_settings
+from tal.features.resumes.evidence_extraction import EvidenceExtractor
 from tal.features.resumes.ollama_evidence import OllamaEvidenceClient
 from tal.features.resumes.openai_evidence import OpenAIEvidenceClient
-from tal.features.resumes.structured_evidence import EvidenceModelClient
+from tal.features.resumes.structured_evidence import (
+    EvidenceModelClient,
+    StructuredEvidenceExtractor,
+)
 
 
 def create_evidence_model_client(
@@ -35,3 +40,16 @@ def create_evidence_model_client(
         client=client,
         model=model,
     )
+
+
+def create_configured_evidence_extractor() -> EvidenceExtractor:
+    settings = get_settings()
+
+    client = create_evidence_model_client(
+        provider=settings.evidence_provider,
+        model=settings.evidence_model,
+        ollama_base_url=settings.ollama_base_url,
+        openai_api_key=settings.openai_api_key,
+    )
+
+    return StructuredEvidenceExtractor(client=client)

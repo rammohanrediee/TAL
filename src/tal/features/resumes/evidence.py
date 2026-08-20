@@ -7,6 +7,7 @@ from tal.features.resumes.entities import Resume, ResumeEvidence, ResumeTextBloc
 from tal.features.resumes.errors import (
     EvidenceNotFoundError,
     EvidenceSourceMismatchError,
+    ResumeNotFoundError,
 )
 from tal.features.resumes.evidence_extraction import validate_evidence_provenance
 from tal.features.resumes.models import EvidenceStatus, EvidenceType
@@ -20,12 +21,11 @@ async def create_resume_evidence(
     source_block_id: UUID,
     evidence_type: EvidenceType,
     extracted_text: str,
-    source_quote: str,
     confidence: float,
     session: AsyncSession,
     skill_normalizer: SkillNormalizer = SKILLS_V1_NORMALIZER,
+    source_quote: str,
 ) -> ResumeEvidence:
-
     result = await session.execute(
         select(ResumeTextBlock).where(
             ResumeTextBlock.resume_id == resume_id,
@@ -45,7 +45,9 @@ async def create_resume_evidence(
     )
 
     normalized_skill = (
-        skill_normalizer.normalize(extracted_text) if evidence_type is EvidenceType.SKILL else None
+        skill_normalizer.normalize(extracted_text)
+        if evidence_type is EvidenceType.SKILL
+        else None
     )
 
     evidence = ResumeEvidence(
@@ -100,3 +102,30 @@ async def correct_resume_evidence(
 
     await session.flush()
     return evidence
+
+
+async def list_resume_evidence(
+    *,
+    resume_id: UUID,
+    user_id: UUID,
+    session: AsyncSession,
+) -> tuple[ResumeEvidence, ...]:
+    resume_result = await session.execute(
+        select(Resume).where(
+            Resume.id == resume_id,
+            Resume.user_id == user_id,
+        )
+    )
+    resume = resume_result.scalar_one_or_none()
+    if resume is None:
+        raise ResumeNotFoundError()
+
+    evidence = await session.execute(
+        select(ResumeEvidence)
+        .where(ResumeEvidence.resume_id == resume_id)
+        .order_by(
+            ResumeEvidence.created_at,
+            ResumeEvidence.id,
+        )
+    )
+    return tuple(evidence.scalars().all())
