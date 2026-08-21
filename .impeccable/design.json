@@ -1,0 +1,215 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-08-21T14:25:25+05:30",
+  "sourceFile": "DESIGN.md",
+  "extensions": {
+    "colorMeta": {
+      "proof-yellow": {
+        "displayName": "Proof Yellow",
+        "role": "Primary action and active proof state",
+        "tonalRamp": ["oklch(0.25 0.08 95)", "oklch(0.36 0.11 95)", "oklch(0.47 0.14 95)", "oklch(0.58 0.17 95)", "oklch(0.69 0.19 95)", "oklch(0.80 0.19 95)", "oklch(0.90 0.14 95)", "oklch(0.97 0.06 95)"]
+      },
+      "proof-yellow-hover": {
+        "displayName": "Proof Yellow Hover",
+        "role": "Hovered primary action",
+        "tonalRamp": ["oklch(0.22 0.07 95)", "oklch(0.33 0.10 95)", "oklch(0.44 0.13 95)", "oklch(0.55 0.16 95)", "oklch(0.66 0.18 95)", "oklch(0.77 0.18 95)", "oklch(0.88 0.13 95)", "oklch(0.96 0.05 95)"]
+      },
+      "workspace-ink": {
+        "displayName": "Workspace Ink",
+        "role": "Primary text and focused work surfaces",
+        "tonalRamp": ["oklch(0.16 0.006 95)", "oklch(0.27 0.006 95)", "oklch(0.38 0.006 95)", "oklch(0.49 0.006 95)", "oklch(0.60 0.006 95)", "oklch(0.71 0.006 95)", "oklch(0.84 0.004 95)", "oklch(0.96 0.002 95)"]
+      },
+      "ink-secondary": {
+        "displayName": "Ink Secondary",
+        "role": "Supporting text",
+        "tonalRamp": ["oklch(0.18 0.006 95)", "oklch(0.29 0.006 95)", "oklch(0.40 0.006 95)", "oklch(0.51 0.006 95)", "oklch(0.62 0.006 95)", "oklch(0.73 0.006 95)", "oklch(0.85 0.004 95)", "oklch(0.96 0.002 95)"]
+      },
+      "ink-muted": {
+        "displayName": "Ink Muted",
+        "role": "Metadata and tertiary text",
+        "tonalRamp": ["oklch(0.20 0.006 95)", "oklch(0.31 0.006 95)", "oklch(0.42 0.006 95)", "oklch(0.53 0.006 95)", "oklch(0.64 0.006 95)", "oklch(0.75 0.006 95)", "oklch(0.87 0.004 95)", "oklch(0.97 0.002 95)"]
+      },
+      "canvas": {
+        "displayName": "Canvas",
+        "role": "Warm application background",
+        "tonalRamp": ["oklch(0.20 0.006 95)", "oklch(0.31 0.006 95)", "oklch(0.42 0.006 95)", "oklch(0.53 0.006 95)", "oklch(0.64 0.006 95)", "oklch(0.75 0.006 95)", "oklch(0.87 0.004 95)", "oklch(0.97 0.006 95)"]
+      },
+      "surface": {
+        "displayName": "Surface",
+        "role": "Primary working surface",
+        "tonalRamp": ["oklch(0.20 0 0)", "oklch(0.31 0 0)", "oklch(0.42 0 0)", "oklch(0.53 0 0)", "oklch(0.64 0 0)", "oklch(0.75 0 0)", "oklch(0.88 0 0)", "oklch(1 0 0)"]
+      },
+      "surface-subtle": {
+        "displayName": "Surface Subtle",
+        "role": "Neutral hover and chip surface",
+        "tonalRamp": ["oklch(0.20 0.004 95)", "oklch(0.31 0.004 95)", "oklch(0.42 0.004 95)", "oklch(0.53 0.004 95)", "oklch(0.64 0.004 95)", "oklch(0.75 0.004 95)", "oklch(0.87 0.003 95)", "oklch(0.95 0.004 95)"]
+      },
+      "border": {
+        "displayName": "Border",
+        "role": "Default separator",
+        "tonalRamp": ["oklch(0.18 0.004 95)", "oklch(0.29 0.004 95)", "oklch(0.40 0.004 95)", "oklch(0.51 0.004 95)", "oklch(0.62 0.004 95)", "oklch(0.73 0.004 95)", "oklch(0.84 0.003 95)", "oklch(0.95 0.002 95)"]
+      },
+      "border-strong": {
+        "displayName": "Border Strong",
+        "role": "Selected and editable separator",
+        "tonalRamp": ["oklch(0.16 0.004 95)", "oklch(0.27 0.004 95)", "oklch(0.38 0.004 95)", "oklch(0.49 0.004 95)", "oklch(0.60 0.004 95)", "oklch(0.71 0.004 95)", "oklch(0.82 0.003 95)", "oklch(0.93 0.002 95)"]
+      },
+      "success": {
+        "displayName": "Success",
+        "role": "Verified evidence",
+        "tonalRamp": ["oklch(0.22 0.06 145)", "oklch(0.33 0.08 145)", "oklch(0.44 0.10 145)", "oklch(0.55 0.12 145)", "oklch(0.66 0.12 145)", "oklch(0.77 0.10 145)", "oklch(0.88 0.07 145)", "oklch(0.96 0.03 145)"]
+      },
+      "success-soft": {
+        "displayName": "Success Soft",
+        "role": "Verified evidence background",
+        "tonalRamp": ["oklch(0.22 0.05 145)", "oklch(0.33 0.07 145)", "oklch(0.44 0.09 145)", "oklch(0.55 0.10 145)", "oklch(0.66 0.10 145)", "oklch(0.77 0.08 145)", "oklch(0.88 0.05 145)", "oklch(0.95 0.025 145)"]
+      },
+      "warning": {
+        "displayName": "Warning",
+        "role": "Adjacent or incomplete evidence",
+        "tonalRamp": ["oklch(0.22 0.05 85)", "oklch(0.33 0.08 85)", "oklch(0.44 0.11 85)", "oklch(0.55 0.14 85)", "oklch(0.66 0.14 85)", "oklch(0.77 0.11 85)", "oklch(0.88 0.07 85)", "oklch(0.96 0.03 85)"]
+      },
+      "warning-soft": {
+        "displayName": "Warning Soft",
+        "role": "Adjacent or incomplete evidence background",
+        "tonalRamp": ["oklch(0.22 0.04 85)", "oklch(0.33 0.06 85)", "oklch(0.44 0.08 85)", "oklch(0.55 0.10 85)", "oklch(0.66 0.10 85)", "oklch(0.77 0.08 85)", "oklch(0.88 0.05 85)", "oklch(0.95 0.025 85)"]
+      },
+      "danger": {
+        "displayName": "Danger",
+        "role": "Conflicting or unsupported evidence",
+        "tonalRamp": ["oklch(0.22 0.06 25)", "oklch(0.33 0.09 25)", "oklch(0.44 0.12 25)", "oklch(0.55 0.14 25)", "oklch(0.66 0.14 25)", "oklch(0.77 0.11 25)", "oklch(0.88 0.07 25)", "oklch(0.96 0.03 25)"]
+      },
+      "danger-soft": {
+        "displayName": "Danger Soft",
+        "role": "Conflicting or unsupported evidence background",
+        "tonalRamp": ["oklch(0.22 0.05 25)", "oklch(0.33 0.07 25)", "oklch(0.44 0.09 25)", "oklch(0.55 0.10 25)", "oklch(0.66 0.10 25)", "oklch(0.77 0.08 25)", "oklch(0.88 0.05 25)", "oklch(0.95 0.025 25)"]
+      }
+    },
+    "typographyMeta": {
+      "display": {"displayName": "Display", "role": "One decisive statement per view", "sample": "Your résumé is ready to prove things."},
+      "headline": {"displayName": "Headline", "role": "Evidence and result page title", "sample": "Here’s what your résumé can prove."},
+      "title": {"displayName": "Title", "role": "Panel and section title", "sample": "Review exact sources"},
+      "body": {"displayName": "Body", "role": "Guidance and explanations", "sample": "TAL connects each claim to the exact place it came from."},
+      "label": {"displayName": "Label", "role": "Actions and field labels", "sample": "Attach résumé"},
+      "meta": {"displayName": "Metadata", "role": "Source locations and compact status", "sample": "Experience · page 1"}
+    },
+    "shadows": [],
+    "motion": {
+      "standard": {"duration": "180ms", "easing": "cubic-bezier(0.16, 1, 0.3, 1)", "usage": "Hover, expansion, and direct state changes"},
+      "working": {"duration": "900ms", "easing": "linear", "usage": "Analyzing progress ring only"},
+      "skeleton": {"duration": "1400ms", "easing": "ease-in-out", "usage": "Loading placeholders that mirror final structure"},
+      "reducedMotion": {"duration": "0.01ms", "usage": "All nonessential animation becomes effectively instant"}
+    },
+    "breakpoints": {
+      "sm": "640px",
+      "md": "768px",
+      "lg": "1024px"
+    }
+  },
+  "components": [
+    {
+      "id": "button-primary",
+      "name": "Primary Button",
+      "category": "Actions",
+      "description": "The one yellow next action in a region.",
+      "usage": "Use for attach, continue, review, or another single decisive step.",
+      "code": "<button class=\"ds-primary\" type=\"button\">Review 3 proofs</button><style>.ds-primary{min-height:44px;padding:12px 20px;border:0;border-radius:10px;background:#ffd400;color:#141413;font:700 .875rem/1.4 Geist,system-ui,sans-serif;cursor:pointer;transition:background 180ms cubic-bezier(.16,1,.3,1),transform 180ms cubic-bezier(.16,1,.3,1)}.ds-primary:hover{background:#e9c200}.ds-primary:active{transform:translateY(1px)}.ds-primary:focus-visible{outline:2px solid #141413;outline-offset:3px}.ds-primary:disabled{background:#ecece8;color:#6e6e68;cursor:not-allowed;transform:none}@media(prefers-reduced-motion:reduce){.ds-primary{transition:none}}</style>"
+    },
+    {
+      "id": "button-dark",
+      "name": "Dark Button",
+      "category": "Actions",
+      "description": "A commit action inside a light evidence surface.",
+      "usage": "Use for saving an inline correction.",
+      "code": "<button class=\"ds-dark\" type=\"button\">Save correction</button><style>.ds-dark{min-height:44px;padding:12px 20px;border:1px solid #141413;border-radius:10px;background:#141413;color:#fff;font:700 .875rem/1.4 Geist,system-ui,sans-serif;cursor:pointer;transition:background 180ms cubic-bezier(.16,1,.3,1)}.ds-dark:hover{background:#2b2b29}.ds-dark:focus-visible{outline:2px solid #141413;outline-offset:3px}.ds-dark:disabled{border-color:#d8d8d2;background:#ecece8;color:#6e6e68;cursor:not-allowed}</style>"
+    },
+    {
+      "id": "button-secondary",
+      "name": "Secondary Button",
+      "category": "Actions",
+      "description": "A reversible or lower-emphasis action.",
+      "usage": "Use for cancel, remove, or retry beside a primary action.",
+      "code": "<button class=\"ds-secondary\" type=\"button\">Cancel</button><style>.ds-secondary{min-height:44px;padding:12px 20px;border:1px solid #d8d8d2;border-radius:10px;background:#fff;color:#141413;font:700 .875rem/1.4 Geist,system-ui,sans-serif;cursor:pointer;transition:background 180ms cubic-bezier(.16,1,.3,1),border-color 180ms cubic-bezier(.16,1,.3,1)}.ds-secondary:hover{border-color:#a9a9a2;background:#ecece8}.ds-secondary:focus-visible{outline:2px solid #141413;outline-offset:3px}.ds-secondary:disabled{color:#6e6e68;cursor:not-allowed}</style>"
+    },
+    {
+      "id": "status-chip",
+      "name": "Status Chip",
+      "category": "Evidence",
+      "description": "A concise semantic evidence state with text.",
+      "usage": "Use for Verified, Needs review, or Conflict. Never rely on color alone.",
+      "code": "<span class=\"ds-chip ds-chip--verified\"><span aria-hidden=\"true\">✓</span> Verified</span><style>.ds-chip{display:inline-flex;align-items:center;gap:6px;min-height:28px;padding:5px 10px;border-radius:9999px;font:600 .75rem/1.4 Geist,system-ui,sans-serif}.ds-chip--verified{background:#e2f1e7;color:#247b46}.ds-chip--review{background:#fff3c2;color:#785900}.ds-chip--conflict{background:#f7e2e2;color:#a92f2f}</style>"
+    },
+    {
+      "id": "navigation-item",
+      "name": "Navigation Item",
+      "category": "Navigation",
+      "description": "A 48px sidebar destination with a clear active state.",
+      "usage": "Use within the 256px dark desktop sidebar.",
+      "code": "<a class=\"ds-nav ds-nav--active\" href=\"#\"><span aria-hidden=\"true\">◎</span><span>Evidence</span></a><style>.ds-nav{display:flex;align-items:center;gap:12px;min-height:48px;padding:0 14px;border-radius:10px;color:rgba(255,255,255,.72);font:700 .875rem/1.4 Geist,system-ui,sans-serif;text-decoration:none;transition:background 180ms cubic-bezier(.16,1,.3,1),color 180ms cubic-bezier(.16,1,.3,1)}.ds-nav:hover{background:rgba(255,255,255,.06);color:#fff}.ds-nav--active{background:rgba(255,255,255,.10);color:#ffd400}.ds-nav:focus-visible{outline:2px solid #ffd400;outline-offset:3px}</style>"
+    },
+    {
+      "id": "upload-composer",
+      "name": "Upload Composer",
+      "category": "Input",
+      "description": "The first-step dark work surface for attaching a résumé.",
+      "usage": "Show before analysis. State file types and limits before upload.",
+      "code": "<section class=\"ds-upload\"><div><h3>Attach your résumé</h3><p>PDF or DOCX · up to 10 MB</p></div><button type=\"button\">Choose file</button></section><style>.ds-upload{display:flex;align-items:center;justify-content:space-between;gap:24px;padding:24px;border-radius:16px;background:#141413;color:#fff;font-family:Geist,system-ui,sans-serif}.ds-upload h3{margin:0 0 4px;font-size:1.5rem;line-height:1.2}.ds-upload p{margin:0;color:rgba(255,255,255,.68);font-size:.875rem}.ds-upload button{min-height:44px;padding:12px 20px;border:0;border-radius:10px;background:#ffd400;color:#141413;font-weight:700;cursor:pointer}.ds-upload button:hover{background:#e9c200}.ds-upload button:focus-visible{outline:2px solid #ffd400;outline-offset:3px}@media(max-width:639px){.ds-upload{align-items:stretch;flex-direction:column}.ds-upload button{width:100%}}</style>"
+    },
+    {
+      "id": "analyzing-panel",
+      "name": "Analyzing Panel",
+      "category": "Progress",
+      "description": "A collapsible factual account of useful work and artifacts.",
+      "usage": "Show concise progress summaries, never private chain-of-thought.",
+      "code": "<details class=\"ds-analysis\"><summary><span class=\"ds-ring\" aria-hidden=\"true\"></span><span>Analyzing</span><small>3 checks complete</small></summary><ol><li>Read résumé sections</li><li>Mapped claims to exact sources</li><li>Flagged one item for review</li></ol></details><style>.ds-analysis{padding:20px;border-radius:16px;background:#141413;color:#fff;font-family:Geist,system-ui,sans-serif}.ds-analysis summary{display:flex;align-items:center;gap:12px;min-height:44px;cursor:pointer;font-weight:800;list-style:none}.ds-analysis summary::-webkit-details-marker{display:none}.ds-analysis small{margin-left:auto;color:rgba(255,255,255,.62);font-weight:600}.ds-analysis ol{margin:16px 0 0 9px;padding-left:26px;border-left:1px solid rgba(255,255,255,.20);color:rgba(255,255,255,.78);line-height:1.8}.ds-ring{width:18px;height:18px;border:2px solid rgba(255,255,255,.22);border-top-color:#ffd400;border-radius:50%;animation:ds-spin 900ms linear infinite}@keyframes ds-spin{to{transform:rotate(360deg)}}.ds-analysis:focus-within{outline:2px solid #ffd400;outline-offset:3px}@media(prefers-reduced-motion:reduce){.ds-ring{animation:none;border-color:#ffd400}}</style>"
+    },
+    {
+      "id": "evidence-row",
+      "name": "Evidence Row",
+      "category": "Evidence",
+      "description": "A divider-led proof record connecting a claim to an exact source.",
+      "usage": "Repeat inside one bordered evidence list; stack fields on mobile.",
+      "code": "<article class=\"ds-evidence\"><span class=\"ds-number\">1</span><div><strong>Built production APIs</strong><p>Verified résumé claim</p></div><span class=\"ds-chip\">FastAPI</span><a href=\"#source\">Experience · page 1</a></article><style>.ds-evidence{display:grid;grid-template-columns:32px minmax(0,1fr) auto minmax(150px,.6fr);align-items:center;gap:16px;padding:18px 0;border-bottom:1px solid #d8d8d2;color:#141413;font-family:Geist,system-ui,sans-serif}.ds-evidence:last-child{border-bottom:0}.ds-number{display:grid;width:32px;height:32px;place-items:center;border-radius:50%;background:#141413;color:#fff;font-size:.75rem;font-weight:700}.ds-evidence strong{font-size:1rem}.ds-evidence p{margin:3px 0 0;color:#6e6e68;font-size:.75rem}.ds-evidence .ds-chip{padding:5px 10px;border:1px solid #d8d8d2;border-radius:9999px;font-size:.75rem}.ds-evidence a{color:#141413;text-underline-offset:3px}.ds-evidence a:focus-visible{outline:2px solid #141413;outline-offset:3px}@media(max-width:767px){.ds-evidence{grid-template-columns:32px 1fr}.ds-evidence .ds-chip,.ds-evidence a{grid-column:2}}</style>"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Proof Workbench",
+    "overview": "TAL's creative north star is The Proof Workbench: a calm, editorial workspace where a job seeker can attach a résumé, watch TAL verify it, and inspect the exact evidence behind every claim. The interface should feel decisive and useful, not magical. Proof is the product; AI remains a quiet implementation detail.",
+    "characteristics": [
+      "Proof-first: exact source text, provenance, conflicts, and uncertainty are visible before conclusions.",
+      "Editorial hierarchy: large black headlines, short supporting copy, and compact evidence metadata.",
+      "Restrained color: yellow marks the next action or current state; semantic colors communicate verification status.",
+      "Flat workbench: borders, dividers, and tonal surfaces create structure without decorative depth.",
+      "Progressive disclosure: Analyzing summaries stay compact and expandable; they never expose private chain-of-thought.",
+      "Responsive by structure: desktop uses a 256px sidebar and broad evidence tables; mobile collapses navigation and stacks evidence fields without shrinking touch targets.",
+      "Honest motion: only progress, state changes, and direct manipulation animate."
+    ],
+    "rules": [
+      "Proof First Rule: Proof Yellow is the only default accent and marks the single primary action or active proof state.",
+      "Workbench Rule: Near-black focus surfaces, warm neutral canvas, white working surfaces, borders, and dividers create structure without decorative shadow.",
+      "Semantic Evidence Rule: Verified, adjacent, conflict, and unknown states always pair color with a label or icon.",
+      "One Family Rule: Geist is the product family; Geist Mono is reserved for technical identifiers and diagnostics.",
+      "Evidence Hierarchy Rule: One short, oversized statement leads each view; exact evidence remains compact and scannable."
+    ],
+    "dos": [
+      "Lead with what the user's résumé can prove, not an opaque intelligence score.",
+      "Show exact source text, source location, verification state, conflicts, and unknowns.",
+      "Keep Analyzing collapsed by default after completion and let users inspect it on demand.",
+      "Use one yellow primary action per region and preserve at least 44px touch targets.",
+      "Keep labels outside fields, keyboard focus visible, and interactions usable without color alone.",
+      "Preserve user input across retries and make corrections reversible.",
+      "Use responsive structural changes at 640px, 768px, and 1024px rather than proportionally shrinking the desktop UI.",
+      "Keep recommendations calm, direct, specific, and honest about uncertainty."
+    ],
+    "donts": [
+      "Present TAL as a generic chatbot, an LLM wrapper, or a résumé intelligence dashboard.",
+      "Copy another product's branding, proprietary assets, or distinctive interface.",
+      "Reveal or simulate private chain-of-thought; show concise progress summaries and evidence artifacts instead.",
+      "Fabricate job URLs, match scores, metrics, testimonials, résumé changes, or download capability.",
+      "Hide unsupported claims behind confidence badges or decorative analytics.",
+      "Use gradients, glassmorphism, glow, excessive shadows, oversized rounding, or a card around every sentence.",
+      "Use yellow decoratively or allow multiple yellow calls to action to compete.",
+      "Remove provenance when condensing content for mobile."
+    ]
+  }
+}
