@@ -11,11 +11,19 @@ from sqlalchemy.ext.asyncio import (
 
 from tal.db.base import Base
 from tal.features.auth.entities import User
-from tal.features.resumes.entities import Resume, ResumeTextBlock
+from tal.features.resumes.entities import (
+    Resume,
+    ResumeEvidence,
+    ResumeTextBlock,
+)
 from tal.features.resumes.errors import ResumeExtractionError
 from tal.features.resumes.extraction import ExtractedBlock, ExtractedDocument
-from tal.features.resumes.models import ResumeStatus
+from tal.features.resumes.models import EvidenceType, ResumeStatus
 from tal.features.resumes.processing import process_resume, save_extracted_document
+from tal.features.resumes.schemas import (
+    EvidenceSourceBlock,
+    ExtractedEvidenceCandidate,
+)
 
 FIXTURE_DIR = Path(__file__).parent.parent.parent / "fixtures" / "resumes"
 
@@ -32,6 +40,28 @@ class FakeDownloadStorage:
     ) -> bytes:
         self.downloaded_keys.append(storage_key)
         return self.data
+
+
+class FakeEvidenceExtractor:
+    async def extract(
+        self,
+        *,
+        blocks: tuple[EvidenceSourceBlock, ...],
+    ) -> tuple[ExtractedEvidenceCandidate, ...]:
+        source_block = next(
+            block for block in blocks
+            if "Python and PostgreSQL" in block.text
+        )
+
+        return (
+            ExtractedEvidenceCandidate(
+                evidence_type=EvidenceType.SKILL,
+                claim_text="Python",
+                source_block_id=source_block.id,
+                source_quote="Python and PostgreSQL",
+                confidence=0.95,
+            ),
+        )
 
 
 @pytest.fixture
@@ -112,6 +142,7 @@ async def test_save_extracted_document_preserves_block_provenance(
 async def test_process_resume_downloads_extracts_and_marks_ready(
         session:AsyncSession,
 )->None:
+    evidence_extractor = FakeEvidenceExtractor()
     pdf_bytes=(
          FIXTURE_DIR / "two_page_resume.pdf"
     ).read_bytes()
@@ -135,6 +166,7 @@ async def test_process_resume_downloads_extracts_and_marks_ready(
         resume_id=resume.id,
         session=session,
         storage=storage,
+        evidence_extractor=evidence_extractor,
     )
     await session.refresh(resume)
 
@@ -144,6 +176,12 @@ async def test_process_resume_downloads_extracts_and_marks_ready(
         .order_by(ResumeTextBlock.ordinal)
     )
     saved_blocks=result.scalars().all()
+    evidence_result = await session.execute(
+        select(ResumeEvidence).where(
+            ResumeEvidence.resume_id == resume.id
+        )
+    )
+    saved_evidence = evidence_result.scalars().all()
 
     assert storage.downloaded_keys==[resume.storage_key]
     assert resume.status==ResumeStatus.READY
@@ -151,6 +189,12 @@ async def test_process_resume_downloads_extracts_and_marks_ready(
     assert [block.page_number for block in saved_blocks] == [1, 2]
     assert "Built FastAPI services" in saved_blocks[0].text
     assert "Python and PostgreSQL" in saved_blocks[1].text
+    assert len(saved_evidence) == 1
+    evidence = saved_evidence[0]
+    assert evidence.extracted_text == "Python"
+    assert evidence.source_text == "Python and PostgreSQL"
+    assert evidence.source_block_id == saved_blocks[1].id
+    assert evidence.canonical_skill_name == "Python"
 
 
 
@@ -160,6 +204,7 @@ async def test_process_resume_marks_failed_when_extraction_fails(
 ) -> None:
     corrupted_pdf = b"%PDF-1.7\ncorrupted\n%%EOF"
     storage = FakeDownloadStorage(corrupted_pdf)
+    evidence_extractor = FakeEvidenceExtractor()
 
     user = User(email="failed-processing@example.com")
     session.add(user)
@@ -181,6 +226,7 @@ async def test_process_resume_marks_failed_when_extraction_fails(
             resume_id=resume.id,
             session=session,
             storage=storage,
+            evidence_extractor=evidence_extractor,
         )
 
     await session.refresh(resume)
@@ -204,6 +250,7 @@ async def test_process_resume_is_idempotent_when_already_ready(
         FIXTURE_DIR / "two_page_resume.pdf"
     ).read_bytes()
     storage = FakeDownloadStorage(pdf_bytes)
+    evidence_extractor = FakeEvidenceExtractor()
 
     user = User(email="retry-processing@example.com")
     session.add(user)
@@ -224,11 +271,13 @@ async def test_process_resume_is_idempotent_when_already_ready(
         resume_id=resume.id,
         session=session,
         storage=storage,
+        evidence_extractor=evidence_extractor,
     )
     await process_resume(
         resume_id=resume.id,
         session=session,
         storage=storage,
+        evidence_extractor=evidence_extractor,
     )
 
     await session.refresh(resume)

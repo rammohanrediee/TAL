@@ -9,8 +9,15 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from tal.db.session import get_db_session
 from tal.features.auth.dependencies import get_current_user
 from tal.features.auth.entities import User
+from tal.features.resumes.evidence import (
+    correct_resume_evidence,
+    list_resume_evidence,
+)
+from tal.features.resumes.evidence_client_factory import (
+    create_configured_evidence_extractor,
+)
 from tal.features.resumes.processing import process_resume
-from tal.features.resumes.schemas import ResumeRead
+from tal.features.resumes.schemas import ResumeEvidenceCorrection, ResumeEvidenceRead, ResumeRead
 from tal.features.resumes.service import (
     create_resume_from_upload,
     delete_resume,
@@ -50,6 +57,7 @@ async def upload_resume(
                 resume_id=resume.id,
                 session=session,
                 storage=storage,
+                evidence_extractor=create_configured_evidence_extractor(),
             )
         except Exception:
             logger.exception(
@@ -88,3 +96,35 @@ async def del_resume(
         session=session,
         storage=storage,
     )
+
+@router.get("/{resume_id}/evidence",response_model=list[ResumeEvidenceRead])
+async def get_resume_evidence(
+    resume_id:UUID,
+    current_user:Annotated[User, Depends(get_current_user)],
+    session:Annotated[AsyncSession, Depends(get_db_session)],
+)->list[ResumeEvidenceRead]:
+    return await list_resume_evidence(
+        resume_id=resume_id,
+        user_id=current_user.id,
+        session=session,
+    )
+
+
+@router.patch("/evidence/{evidence_id}",
+              response_model=ResumeEvidenceRead)
+async def correct_evidence(
+    evidence_id:UUID,
+    correction:ResumeEvidenceCorrection,
+    current_user:Annotated[User, Depends(get_current_user)],
+    session:Annotated[AsyncSession, Depends(get_db_session)],
+)->ResumeEvidenceRead:
+    evidence=await correct_resume_evidence(
+        evidence_id=evidence_id,
+        user_id=current_user.id,
+        corrected_text=correction.corrected_text,
+        session=session
+    )
+    await session.commit()
+    await session.refresh(evidence)
+
+    return evidence

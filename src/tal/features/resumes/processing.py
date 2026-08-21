@@ -7,6 +7,10 @@ from tal.features.resumes.errors import (
     ResumeExtractionError,
     ResumeNotFoundError,
 )
+from tal.features.resumes.evidence_extraction import (
+    EvidenceExtractor,
+    extract_resume_evidence,
+)
 from tal.features.resumes.extraction import (
     ExtractedDocument,
     extract_docx,
@@ -50,6 +54,7 @@ async def process_resume(
         resume_id:UUID,
         session:AsyncSession,
         storage:StorageBackend,
+        evidence_extractor:EvidenceExtractor,
 )->None:
     resume=await session.get(Resume,resume_id)
 
@@ -85,6 +90,11 @@ async def process_resume(
     await save_extracted_document(
         resume_id=resume.id,
         document=document,
+        session=session,
+    )
+    await extract_resume_evidence(
+        resume_id=resume.id,
+        extractor=evidence_extractor,
         session=session,
     )
     resume.status=ResumeStatus.READY
