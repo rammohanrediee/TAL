@@ -108,3 +108,62 @@ body {
     animation-duration: 0.01ms !important;
   }
 }
+
+/* TAL proof-led product workspace */
+:root {
+  --tal-canvas: #f5f5f2;
+  --tal-surface: #ffffff;
+  --tal-subtle: #ecece8;
+  --tal-ink: #141413;
+  --tal-secondary: #4f4f4a;
+  --tal-muted: #6e6e68;
+  --tal-border: #d8d8d2;
+  --tal-border-strong: #a9a9a2;
+  --tal-yellow: #ffd400;
+  --tal-yellow-hover: #e9c200;
+  --tal-green: #247b46;
+  --tal-green-soft: #e2f1e7;
+  --tal-warning: #785900;
+  --tal-warning-soft: #fff3c2;
+  --tal-red: #a92f2f;
+  --tal-red-soft: #f7e2e2;
+}
+
+@theme inline {
+  --color-tal-canvas: var(--tal-canvas);
+  --color-tal-surface: var(--tal-surface);
+  --color-tal-subtle: var(--tal-subtle);
+  --color-tal-ink: var(--tal-ink);
+  --color-tal-secondary: var(--tal-secondary);
+  --color-tal-muted: var(--tal-muted);
+  --color-tal-border: var(--tal-border);
+  --color-tal-border-strong: var(--tal-border-strong);
+  --color-tal-yellow: var(--tal-yellow);
+  --color-tal-yellow-hover: var(--tal-yellow-hover);
+  --color-tal-green: var(--tal-green);
+  --color-tal-green-soft: var(--tal-green-soft);
+  --color-tal-warning: var(--tal-warning);
+  --color-tal-warning-soft: var(--tal-warning-soft);
+  --color-tal-red: var(--tal-red);
+  --color-tal-red-soft: var(--tal-red-soft);
+}
+
+.tal-working-ring {
+  border: 3px solid rgb(255 255 255 / 20%);
+  border-top-color: var(--tal-yellow);
+  animation: tal-spin 0.9s linear infinite;
+}
+
+.tal-skeleton {
+  background: linear-gradient(90deg, var(--tal-subtle) 25%, #deded8 50%, var(--tal-subtle) 75%);
+  background-size: 200% 100%;
+  animation: tal-skeleton 1.4s ease-in-out infinite;
+}
+
+@keyframes tal-spin {
+  to { transform: rotate(360deg); }
+}
+
+@keyframes tal-skeleton {
+  to { background-position: -200% 0; }
+}

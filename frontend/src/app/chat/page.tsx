@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 
-import TalWorkspace from "@/components/tal-workspace";
+import ProofWorkspace from "@/components/proof-workspace";
 
 export const metadata: Metadata = {
   title: "Chat | TAL",
@@ -8,5 +8,5 @@ export const metadata: Metadata = {
 };
 
 export default function ChatPage() {
-  return <TalWorkspace />;
+  return <ProofWorkspace />;
 }

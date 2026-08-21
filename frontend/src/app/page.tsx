@@ -1,5 +1,5 @@
-import TalWorkspace from "@/components/tal-workspace";
+import ProofWorkspace from "@/components/proof-workspace";
 
 export default function Home() {
-  return <TalWorkspace />;
+  return <ProofWorkspace />;
 }
