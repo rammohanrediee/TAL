@@ -15,6 +15,7 @@ from tal.features.applications.service import get_application, update_applicatio
 from tal.features.applications.service import list_applications as list_application_service
 from tal.features.auth.dependencies import get_current_user
 from tal.features.auth.entities import User
+
 router = APIRouter(prefix="/applications")
 
 

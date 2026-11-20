@@ -1,7 +1,7 @@
 from sqlalchemy import UniqueConstraint
 
-from tal.features.auth.entities import ExternalAccount
-from tal.features.auth.entities import User
+from tal.features.auth.entities import ExternalAccount, User
+
 
 def test_provider_identity_is_unique() -> None:
     unique_column_sets = {

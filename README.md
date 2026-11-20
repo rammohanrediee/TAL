@@ -146,13 +146,25 @@ cp .env.example .env
 
 The backend requires database, JWT, OAuth, and session secrets. Google OAuth must use
 the callback URL configured by `GOOGLE_REDIRECT_URI`. Secret values must remain in the
-local `.env` file and must not be committed.
+local `.env` file and must not be committed. Local `.env` values override the Neon
+values in `.env.local`.
+
+If you use an existing native PostgreSQL server on port 5432, run
+`python scripts/configure_local_env.py`. It asks for the database username, database
+name, and password, verifies the connection, and saves the URL to `.env` without
+printing the password. Add your real Google and R2 credentials to `.env` to use
+Google sign-in and resume storage.
 
 ### 4. Start local infrastructure
 
+For the native PostgreSQL server, start Redis only:
+
 ```bash
-docker compose up -d
+docker compose up -d redis
 ```
+
+If you use Docker for both PostgreSQL and Redis instead, stop any other server on
+port 5432 and run `docker compose up -d`.
 
 ### 5. Apply database migrations
 
@@ -177,6 +189,18 @@ npm run dev
 ```
 
 The web interface runs at `http://localhost:3000` by default.
+
+## Vercel frontend deployment
+
+Import the repository into Vercel with **Root Directory set to `frontend`**.
+Set `TAL_API_URL` to the Cloudflare backend's HTTPS origin, without a trailing
+slash, in the Vercel project environment. The frontend rewrites `/backend/*`
+requests to that origin. The FastAPI backend stays on Cloudflare and does not
+need a Vercel service or binding.
+
+Google sign-in also needs the deployed frontend URL in Cloudflare's
+`FRONTEND_URL` and the matching `/backend/api/v1/auth/google/callback` URL in
+`GOOGLE_REDIRECT_URI` and Google Cloud Console.
 
 ## Quality checks
 

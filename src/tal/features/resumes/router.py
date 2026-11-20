@@ -103,11 +103,12 @@ async def get_resume_evidence(
     current_user:Annotated[User, Depends(get_current_user)],
     session:Annotated[AsyncSession, Depends(get_db_session)],
 )->list[ResumeEvidenceRead]:
-    return await list_resume_evidence(
+    evidence = await list_resume_evidence(
         resume_id=resume_id,
         user_id=current_user.id,
         session=session,
     )
+    return [ResumeEvidenceRead.model_validate(item) for item in evidence]
 
 
 @router.patch("/evidence/{evidence_id}",
@@ -127,4 +128,4 @@ async def correct_evidence(
     await session.commit()
     await session.refresh(evidence)
 
-    return evidence
+    return ResumeEvidenceRead.model_validate(evidence)

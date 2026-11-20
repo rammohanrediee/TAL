@@ -1,15 +1,15 @@
 from io import BytesIO
 from pathlib import Path
+
+import pytest
 from docx import Document
 from pypdf import PdfWriter
-import pytest
 
 from tal.features.resumes.errors import (
     ResumeExtractionError,
     ResumeTextNotFoundError,
 )
 from tal.features.resumes.extraction import extract_docx, extract_pdf
-
 
 FIXTURE_DIR = Path(__file__).parent.parent.parent / "fixtures" / "resumes"
 

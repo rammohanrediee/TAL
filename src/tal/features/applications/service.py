@@ -12,7 +12,9 @@ from tal.features.applications.schemas import (
 )
 
 
-async def create_application(payload: ApplicationCreate, session: AsyncSession, user_id: UUID) -> ApplicationRead:
+async def create_application(
+    payload: ApplicationCreate, session: AsyncSession, user_id: UUID
+) -> ApplicationRead:
     data = payload.model_dump()
     data["job_url"] = str(payload.job_url) if payload.job_url else None
     data["user_id"] = user_id

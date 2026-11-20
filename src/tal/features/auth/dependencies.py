@@ -1,6 +1,6 @@
 from typing import Annotated
 
-from fastapi import Depends,Request
+from fastapi import Depends, Request
 from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.ext.asyncio import AsyncSession
 

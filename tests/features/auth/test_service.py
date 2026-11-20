@@ -1,4 +1,5 @@
 from collections.abc import AsyncIterator
+from unittest.mock import AsyncMock
 
 import pytest
 from sqlalchemy import select
@@ -7,26 +8,24 @@ from sqlalchemy.ext.asyncio import (
     async_sessionmaker,
     create_async_engine,
 )
-from tal.features.auth.errors import AccountLinkRequiredError
-from tal.features.auth.security import hash_password
-from tal.features.auth.service import get_or_create_external_user
-from sqlalchemy.ext.asyncio import AsyncSession
-from tal.features.auth.service import find_external_user
-from tal.db.base import Base
-from tal.features.auth.entities import User
-from tal.features.auth.errors import EmailAlreadyRegisteredError
-from tal.features.auth.schemas import UserRegister
-from tal.features.auth.security import verify_password
-from tal.features.auth.service import register
-from unittest.mock import AsyncMock
-from tal.features.auth.entities import ExternalAccount
-from tal.features.auth.service import create_external_user
-import pytest
-from sqlalchemy.ext.asyncio import AsyncSession
 
-from tal.features.auth.entities import User
-from tal.features.auth.errors import InvalidCredentialsError
-from tal.features.auth.service import authenticate_user
+from tal.db.base import Base
+from tal.features.auth.entities import ExternalAccount, User
+from tal.features.auth.errors import (
+    AccountLinkRequiredError,
+    EmailAlreadyRegisteredError,
+    InvalidCredentialsError,
+)
+from tal.features.auth.schemas import UserRegister
+from tal.features.auth.security import hash_password, verify_password
+from tal.features.auth.service import (
+    authenticate_user,
+    create_external_user,
+    find_external_user,
+    get_or_create_external_user,
+    register,
+)
+
 
 @pytest.fixture
 async def db_session() -> AsyncIterator[AsyncSession]:

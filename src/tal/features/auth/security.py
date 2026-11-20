@@ -1,10 +1,11 @@
-from pwdlib import PasswordHash
-from datetime import UTC,datetime,timedelta
+from datetime import UTC, datetime, timedelta
 from uuid import UUID
-import jwt
-from tal.core.config import settings
-from jwt.exceptions import InvalidTokenError
 
+import jwt
+from jwt.exceptions import InvalidTokenError
+from pwdlib import PasswordHash
+
+from tal.core.config import settings
 from tal.features.auth.errors import InvalidCredentialsError
 
 password_hasher = PasswordHash.recommended()

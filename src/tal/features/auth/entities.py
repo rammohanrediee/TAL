@@ -1,11 +1,13 @@
 
-from uuid import UUID, uuid4
 from datetime import UTC, datetime
-import uuid
-from tal.db.base import Base
+from uuid import UUID, uuid4
+
 from sqlalchemy import DateTime, ForeignKey, String, UniqueConstraint, Uuid
 from sqlalchemy.orm import Mapped, mapped_column
-from sqlalchemy import String
+
+from tal.db.base import Base
+
+
 class User(Base):
     __tablename__="users"
     id: Mapped[UUID] = mapped_column(

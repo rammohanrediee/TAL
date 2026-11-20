@@ -12,6 +12,7 @@ from tal.features.resumes.entities import Resume
 from tal.features.resumes.errors import (
     EmptyResumeError,
     InvalidResumeFilenameError,
+    ResumeArchiveTooLargeError,
     ResumeNotFoundError,
     ResumeTooLargeError,
     UnsupportedResumeTypeError,
@@ -20,6 +21,8 @@ from tal.features.resumes.schemas import ResumeRead
 from tal.features.resumes.storage import StorageBackend
 
 PDF_CONTENT_TYPE = "application/pdf"
+MAX_DOCX_ENTRIES = 1_000
+MAX_DOCX_EXPANDED_BYTES = 20 * 1024 * 1024
 
 DOCX_CONTENT_TYPE = (
     "application/vnd.openxmlformats-officedocument."
@@ -45,7 +48,13 @@ def _detect_resume_type(data:bytes)->tuple[str,str]:
         return PDF_CONTENT_TYPE, ".pdf"
     try:
         with ZipFile(BytesIO(data)) as archive:
-            filenames=set(archive.namelist())
+            entries = archive.infolist()
+            if (
+                len(entries) > MAX_DOCX_ENTRIES
+                or sum(entry.file_size for entry in entries) > MAX_DOCX_EXPANDED_BYTES
+            ):
+                raise ResumeArchiveTooLargeError()
+            filenames = {entry.filename for entry in entries}
     except (BadZipFile, OSError):
         raise UnsupportedResumeTypeError() from None
 

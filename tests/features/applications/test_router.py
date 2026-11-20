@@ -7,8 +7,9 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 from tal.db.base import Base
 from tal.db.session import get_db_session
 from tal.features.auth.dependencies import get_current_user
-from tal.main import app
 from tal.features.auth.entities import User
+from tal.main import app
+
 test_engine = create_async_engine("sqlite+aiosqlite:///:memory:")
 TestSessionFactory = async_sessionmaker(test_engine, expire_on_commit=False)
 

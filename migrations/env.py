@@ -2,20 +2,19 @@ from logging.config import fileConfig
 
 from alembic import context
 from sqlalchemy import engine_from_config, pool
-from tal.features.auth import entities as auth_entities  # noqa: F401
+
 from tal.core.config import settings
 from tal.db.base import Base
 from tal.features.applications import entities  # noqa: F401
+from tal.features.auth import entities as auth_entities  # noqa: F401
 from tal.features.resumes import entities as resume_entities  # noqa: F401
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
 config = context.config
-sync_database_url = settings.database_url.replace(
-    "postgresql+asyncpg://",
-    "postgresql+psycopg://",
-    1,
-)
+sync_database_url = (settings.database_url_unpooled or settings.database_url).replace(
+    "postgresql+asyncpg://", "postgresql+psycopg://", 1
+).replace("postgresql://", "postgresql+psycopg://", 1)
 
 config.set_main_option(
     "sqlalchemy.url",

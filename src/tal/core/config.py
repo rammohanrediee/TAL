@@ -7,7 +7,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
-        env_file=".env",
+        env_file=(".env.local", ".env"),
         env_file_encoding="utf-8",
         extra="ignore",
     )
@@ -17,14 +17,15 @@ class Settings(BaseSettings):
     app_debug: bool = False
     api_v1_prefix: str = "/api/v1"
     database_url: str
+    database_url_unpooled: str | None = None
     redis_url: str = "redis://localhost:6379/0"
     secret_key: SecretStr = SecretStr("development-only-change-me")
     access_token_expire_minutes: int = 30
     jwt_secret_key: SecretStr
     jwt_algorithm: str = "HS256"
-    google_client_id: SecretStr
-    google_client_secret: SecretStr
-    google_redirect_uri: str
+    google_client_id: SecretStr | None = None
+    google_client_secret: SecretStr | None = None
+    google_redirect_uri: str | None = None
     r2_account_id: str
     r2_access_key_id: SecretStr
     r2_secret_access_key: SecretStr
@@ -34,9 +35,11 @@ class Settings(BaseSettings):
     resume_max_upload_bytes: int = 5 * 1024 * 1024
     openai_api_key: SecretStr | None = None
     frontend_url: str = "http://localhost:3000/"
-    evidence_provider: Literal["openai", "ollama"] = "openai"
+    evidence_provider: Literal["openai", "ollama", "neon"] = "openai"
     evidence_model: str = "gpt-5-mini"
     ollama_base_url: str = "http://localhost:11434/v1"
+    neon_ai_gateway_base_url: str | None = None
+    neon_ai_gateway_token: SecretStr | None = None
 
 
 @lru_cache

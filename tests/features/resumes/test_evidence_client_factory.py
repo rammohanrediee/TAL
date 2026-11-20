@@ -85,3 +85,40 @@ def test_create_evidence_model_client_rejects_missing_openai_key() -> None:
 
     # Assert
     assert str(captured_error.value) == ("OPENAI_API_KEY is required when EVIDENCE_PROVIDER=openai")
+
+
+def test_create_evidence_model_client_selects_neon_gateway(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    sdk_client = Mock()
+    sdk_client_factory = Mock(return_value=sdk_client)
+    monkeypatch.setattr(
+        "tal.features.resumes.evidence_client_factory.AsyncOpenAI",
+        sdk_client_factory,
+    )
+
+    result = create_evidence_model_client(
+        provider="neon",
+        model="gpt-5-mini",
+        ollama_base_url="http://localhost:11434/v1",
+        openai_api_key=None,
+        neon_ai_gateway_base_url="https://gateway.example.com/",
+        neon_ai_gateway_token=SecretStr("test-token"),
+    )
+
+    assert isinstance(result, OpenAIEvidenceClient)
+    assert result.client is sdk_client
+    sdk_client_factory.assert_called_once_with(
+        base_url="https://gateway.example.com/openai/v1",
+        api_key="test-token",
+    )
+
+
+def test_create_evidence_model_client_requires_neon_credentials() -> None:
+    with pytest.raises(ValueError, match="NEON_AI_GATEWAY_BASE_URL"):
+        create_evidence_model_client(
+            provider="neon",
+            model="gpt-5-mini",
+            ollama_base_url="http://localhost:11434/v1",
+            openai_api_key=None,
+        )

@@ -1,11 +1,17 @@
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
-from tal.features.auth.security import hash_password, verify_password
-from tal.features.auth.schemas import UserRead, UserRegister,UserLogin
 from sqlalchemy.ext.asyncio import AsyncSession
-from tal.features.auth.entities import User
+
 from tal.features.auth.entities import ExternalAccount, User
-from tal.features.auth.errors import EmailAlreadyRegisteredError, InvalidCredentialsError,AccountLinkRequiredError
+from tal.features.auth.errors import (
+    AccountLinkRequiredError,
+    EmailAlreadyRegisteredError,
+    InvalidCredentialsError,
+)
+from tal.features.auth.schemas import UserRead, UserRegister
+from tal.features.auth.security import hash_password, verify_password
+
+
 async def register(payload:UserRegister,
                    session:AsyncSession,)->UserRead:
     data=payload.model_dump()
@@ -44,7 +50,7 @@ async def authenticate_user(email:str,
 async def find_external_user(provider:str,provider_subject:str,
                              session:AsyncSession,)->User | None:
     normalized_provider=provider.strip().lower()
-    return await session.scalar(
+    user = await session.scalar(
         select(User)
         .join(
             ExternalAccount,
@@ -55,6 +61,7 @@ async def find_external_user(provider:str,provider_subject:str,
             ExternalAccount.provider_subject==provider_subject,
         )
     )
+    return user
 
 async def create_external_user(provider:str,provider_subject:str,
                                email:str,

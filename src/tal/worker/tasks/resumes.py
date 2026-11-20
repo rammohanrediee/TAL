@@ -26,7 +26,7 @@ async def run_resume_processing(
             )
     finally:
         await engine.dispose()
-@celery_app.task(name="tal.resume.process")
+@celery_app.task(name="tal.resume.process")  # type: ignore[untyped-decorator]
 def process_resume_task(resume_id:str)->None:
     asyncio.run(
         run_resume_processing(UUID(resume_id))

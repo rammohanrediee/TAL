@@ -1,9 +1,10 @@
 from datetime import UTC, datetime
 from uuid import UUID, uuid4
 
-from sqlalchemy import DateTime, String, Uuid,ForeignKey
+from sqlalchemy import DateTime, ForeignKey, String, Uuid
 from sqlalchemy import Enum as SqlEnum
 from sqlalchemy.orm import Mapped, mapped_column
+
 from tal.db.base import Base
 from tal.features.applications.models import ApplicationStatus
 

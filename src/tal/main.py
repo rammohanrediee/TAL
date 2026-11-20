@@ -3,11 +3,12 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
+from starlette.middleware.sessions import SessionMiddleware
 
 from tal.api.router import api_router
 from tal.core.config import settings
 from tal.core.errors import DomainError
-from starlette.middleware.sessions import SessionMiddleware
+
 
 @asynccontextmanager
 async def lifespan(_: FastAPI) -> AsyncIterator[None]:
@@ -15,7 +16,8 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
     yield
 
 
-async def domain_error_handler(_: Request, error: DomainError) -> JSONResponse:
+async def domain_error_handler(_: Request, error: Exception) -> JSONResponse:
+    assert isinstance(error, DomainError)
     return JSONResponse(
         status_code=error.status_code,
         content={
@@ -46,5 +48,5 @@ app = create_app()
 
 
 @app.get("/")
-def root():
+def root() -> dict[str, str]:
     return {"message": "Welcome to tal "}

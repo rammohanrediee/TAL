@@ -21,3 +21,6 @@ CLAUDE.md
 .agents/
 .codex/
 .tal-data/
+.neon
+node_modules/
+.env.local

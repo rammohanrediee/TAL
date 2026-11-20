@@ -2,7 +2,7 @@ from collections.abc import AsyncIterator
 from io import BytesIO
 from typing import Any
 from uuid import UUID
-from zipfile import ZipFile
+from zipfile import ZIP_DEFLATED, ZipFile
 
 import pytest
 from fastapi.testclient import TestClient
@@ -308,6 +308,32 @@ def test_upload_rejects_disguised_invalid_docx(
     assert response.status_code==415
     assert data["code"]=="unsupported_resume_type"
     assert fake_storage.uploads==[]
+
+
+def test_upload_rejects_docx_with_oversized_expanded_content(
+    client: TestClient,
+    fake_storage: FakeStorage,
+) -> None:
+    buffer = BytesIO()
+    with ZipFile(buffer, "w", compression=ZIP_DEFLATED) as archive:
+        archive.writestr("[Content_Types].xml", "<Types/>")
+        archive.writestr("word/document.xml", b"x" * (21 * 1024 * 1024))
+
+    response = client.post(
+        "/api/v1/resumes/",
+        files={
+            "file": (
+                "oversized.docx",
+                buffer.getvalue(),
+                "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            )
+        },
+    )
+
+    assert len(buffer.getvalue()) < 5 * 1024 * 1024
+    assert response.status_code == 413
+    assert response.json()["code"] == "resume_archive_too_large"
+    assert fake_storage.uploads == []
 
 
 def test_upload_rejects_pdf_content_with_docx_filename(

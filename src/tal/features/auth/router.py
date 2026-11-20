@@ -1,7 +1,7 @@
 from typing import Annotated, cast
 
 from authlib.integrations.base_client.errors import OAuthError  # type: ignore[import-untyped]
-from fastapi import APIRouter, Depends, Request, Response, status
+from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.ext.asyncio import AsyncSession
 from starlette.responses import RedirectResponse
@@ -51,8 +51,8 @@ async def read_current_user(
 @router.get("/google/login", response_class=RedirectResponse)
 async def google_login(request: Request) -> RedirectResponse:
     google = oauth.create_client("google")
-    if google is None:
-        raise RuntimeError("Google oauth client is not configured")
+    if google is None or settings.google_redirect_uri is None:
+        raise HTTPException(status_code=503, detail="Google sign-in is not configured")
     return cast(
         RedirectResponse,
         await google.authorize_redirect(
@@ -69,7 +69,7 @@ async def google_callback(
 ) -> RedirectResponse:
     google = oauth.create_client("google")
     if google is None:
-        raise RuntimeError("Google OAuth client is not configured")
+        raise HTTPException(status_code=503, detail="Google sign-in is not configured")
     try:
         token = await google.authorize_access_token(request)
     except OAuthError as error:

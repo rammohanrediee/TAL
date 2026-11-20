@@ -1,0 +1,18 @@
+# Send only backend source and migration files to Docker.
+**
+!Dockerfile
+!pyproject.toml
+!README.md
+!alembic.ini
+!src/
+!src/**
+!migrations/
+!migrations/**
+**/__pycache__/
+**/*.py[cod]
+
+# Keep local and nested environment files out of the build context.
+.env
+.env.*
+**/.env
+**/.env.*

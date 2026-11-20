@@ -8,6 +8,7 @@ from tal.features.applications.schemas import ApplicationCreate
 from tal.features.applications.service import create_application
 from tal.features.auth.entities import User
 
+
 @pytest.mark.asyncio
 async def test_create_application_persists_application() -> None:
     engine = create_async_engine("sqlite+aiosqlite:///:memory:")

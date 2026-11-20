@@ -1,13 +1,16 @@
 from dataclasses import dataclass
 from io import BytesIO
 from zipfile import BadZipFile
+
+from docx import Document as DocxDocument
 from pypdf import PdfReader
 from pypdf.errors import PdfReadError
-from docx import Document as DocxDocument
+
 from tal.features.resumes.errors import (
     ResumeExtractionError,
     ResumeTextNotFoundError,
 )
+
 
 @dataclass(frozen=True, slots=True)
 class ExtractedBlock:

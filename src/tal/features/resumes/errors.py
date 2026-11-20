@@ -19,6 +19,15 @@ class ResumeTooLargeError(DomainError):
         )
 
 
+class ResumeArchiveTooLargeError(DomainError):
+    def __init__(self) -> None:
+        super().__init__(
+            code="resume_archive_too_large",
+            message="The DOCX expands beyond the supported size.",
+            status_code=413,
+        )
+
+
 class UnsupportedResumeTypeError(DomainError):
     def __init__(self) -> None:
         super().__init__(
