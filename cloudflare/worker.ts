@@ -109,9 +109,14 @@ export class TalContainer extends DurableObject<Env> {
 
   private async startAndWaitForHealth(): Promise<void> {
     const container = this.ctx.container!;
+    const image = container.images.base;
+    const running = await container.inspect();
+    if (running && running.image !== "" && running.image !== image) {
+      await container.destroy();
+    }
     if (!container.running) {
       container.start({
-        image: container.images.base,
+        image,
         instance: "lite",
         enableInternet: true,
         env: {
