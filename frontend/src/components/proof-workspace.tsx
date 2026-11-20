@@ -413,8 +413,8 @@ export default function ProofWorkspace() {
         <Link href="/" className="flex min-h-11 items-center gap-3 px-2 text-lg font-bold tracking-[-0.02em]"><span className="grid size-8 place-items-center rounded-[9px] bg-tal-yellow text-sm font-black text-tal-ink">T</span>TAL</Link>
         <button type="button" onClick={reset} className="mt-7 flex min-h-12 items-center gap-3 rounded-[10px] bg-tal-yellow px-4 text-sm font-bold text-tal-ink transition-colors hover:bg-tal-yellow-hover"><PlusIcon /> New review</button>
         <nav className="mt-8 space-y-1" aria-label="Main navigation">
-          <a href="#main-content" className="flex min-h-11 items-center gap-3 rounded-[10px] bg-white/10 px-3 text-sm font-semibold text-tal-yellow"><HomeIcon /> Home</a>
-          <a href={ready ? "#evidence-review" : "#resume-workflow"} className="flex min-h-11 items-center gap-3 rounded-[10px] px-3 text-sm font-medium text-white/70 transition-colors hover:bg-white/[.06] hover:text-white"><DocumentIcon /> Proofs</a>
+          <Link href="/" className="flex min-h-11 items-center gap-3 rounded-[10px] px-3 text-sm font-medium text-white/70 transition-colors hover:bg-white/[.06] hover:text-white"><HomeIcon /> Home</Link>
+          <a href={ready ? "#evidence-review" : "#resume-workflow"} className="flex min-h-11 items-center gap-3 rounded-[10px] bg-white/10 px-3 text-sm font-semibold text-tal-yellow"><DocumentIcon /> Proofs</a>
           <span aria-disabled="true" title="Applications arrive in a later TAL milestone" className="flex min-h-11 cursor-not-allowed items-center gap-3 rounded-[10px] px-3 text-sm font-medium text-white/35"><BriefcaseIcon /> Applications <span className="ml-auto text-[11px]">Later</span></span>
         </nav>
         <div className="mt-auto border-t border-white/10 pt-4">

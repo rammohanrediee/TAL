@@ -2,7 +2,7 @@
 
 import { useAgent } from "agents/react";
 import { useAgentChat } from "@cloudflare/ai-chat/react";
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 
@@ -20,6 +20,11 @@ async function conversations(path = "", init?: RequestInit) {
 
 function ConversationView({ id, host }: { id: string; host: string }) {
   const [input, setInput] = useState("");
+  const [connected, setConnected] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [attachment, setAttachment] = useState("");
+  const [attachmentError, setAttachmentError] = useState("");
+  const picker = useRef<HTMLInputElement>(null);
   const agent = useAgent({
     agent: "TalChatAgent",
     name: id,
@@ -30,14 +35,51 @@ function ConversationView({ id, host }: { id: string; host: string }) {
     },
     queryDeps: [id],
     cacheTtl: 0,
+    onOpen: () => setConnected(true),
+    onClose: () => setConnected(false),
   });
   const { messages, sendMessage, status } = useAgentChat({ agent });
+
+  useEffect(() => {
+    if (!connected || status !== "ready") return;
+    const key = `tal:pending:${id}`;
+    const pending = sessionStorage.getItem(key);
+    if (!pending) return;
+    sessionStorage.removeItem(key);
+    sendMessage({ text: pending });
+  }, [connected, id, sendMessage, status]);
+
+  async function attach(file: File) {
+    if (file.size > 5 * 1024 * 1024) {
+      setAttachmentError("Résumé must be 5 MB or smaller.");
+      return;
+    }
+    setUploading(true);
+    setAttachmentError("");
+    try {
+      const body = new FormData();
+      body.append("file", file);
+      const response = await fetch(`/backend/api/v1/conversations/${id}/attachment`, {
+        method: "POST", credentials: "include", body,
+      });
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({})) as { message?: string };
+        throw new Error(data.message ?? "Could not attach that résumé.");
+      }
+      const { filename } = await response.json() as { filename: string };
+      setAttachment(filename);
+    } catch (caught) {
+      setAttachmentError(caught instanceof Error ? caught.message : "Could not attach that résumé.");
+    } finally {
+      setUploading(false);
+    }
+  }
 
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const text = input.trim();
-    if (!text || status === "streaming" || status === "submitted") return;
-    sendMessage({ text });
+    if (!connected || (!text && !attachment) || uploading || status === "streaming" || status === "submitted") return;
+    sendMessage({ text: text || "What should I know about my attached résumé?" });
     setInput("");
   }
 
@@ -46,7 +88,7 @@ function ConversationView({ id, host }: { id: string; host: string }) {
       <div className="flex-1 space-y-5 overflow-y-auto px-5 py-8 sm:px-10">
         {messages.length === 0 && (
           <p className="mx-auto max-w-2xl text-sm text-neutral-500">
-            Ask about your job search. Résumé and job analysis tools are coming next.
+            Ask about your job search, or attach a résumé for a grounded answer.
           </p>
         )}
         {messages.map((message) => (
@@ -59,12 +101,19 @@ function ConversationView({ id, host }: { id: string; host: string }) {
         ))}
       </div>
       {status === "error" && <p role="alert" className="px-5 text-sm text-red-300">TAL could not reply. You can send another message.</p>}
+      {attachmentError && <p role="alert" className="px-5 text-sm text-red-300">{attachmentError}</p>}
+      {attachment && <p className="px-5 text-xs text-neutral-400">Attached: {attachment}</p>}
       <form onSubmit={submit} className="flex gap-3 border-t border-white/10 p-4 sm:p-6">
+        <input ref={picker} type="file" accept=".pdf,.docx" className="sr-only" aria-label="Attach a PDF or DOCX résumé"
+          onChange={(event) => { const file = event.target.files?.[0]; if (file) void attach(file); event.target.value = ""; }} />
+        <button type="button" onClick={() => picker.current?.click()} disabled={uploading}
+          aria-label="Attach résumé" title="Attach PDF or DOCX résumé"
+          className="rounded-xl border border-white/20 px-3 text-yellow-400 disabled:opacity-40">{uploading ? "…" : "+"}</button>
         <label htmlFor="chat-message" className="sr-only">Message TAL</label>
         <input id="chat-message" value={input} onChange={(event) => setInput(event.target.value)}
           maxLength={4000} placeholder="Ask TAL about your job search"
           className="min-w-0 flex-1 rounded-xl border border-white/20 bg-neutral-900 px-4 py-3 text-sm outline-none focus:border-yellow-400" />
-        <button type="submit" disabled={!input.trim() || status === "streaming" || status === "submitted"}
+        <button type="submit" disabled={!connected || (!input.trim() && !attachment) || uploading || status === "streaming" || status === "submitted"}
           className="rounded-xl bg-yellow-400 px-5 py-3 font-semibold text-black disabled:opacity-40">
           Send
         </button>
@@ -80,7 +129,11 @@ export default function ChatWorkspace({ host }: { host: string }) {
   const [error, setError] = useState("");
 
   useEffect(() => {
-    conversations().then(setItems).catch((failure) => {
+    conversations().then((loaded: Conversation[]) => {
+      setItems(loaded);
+      const initial = new URLSearchParams(window.location.search).get("conversation");
+      if (initial && loaded.some((item) => item.id === initial)) setSelected(initial);
+    }).catch((failure) => {
       if (failure.message === "signed-out") router.replace("/login");
       else setError("Could not load your chats.");
     });
@@ -123,7 +176,7 @@ export default function ChatWorkspace({ host }: { host: string }) {
             </div>
           ))}
         </div>
-        <Link href="/" className="text-sm text-neutral-400 hover:text-white">Résumé proofs</Link>
+        <Link href="/proofs" className="text-sm text-neutral-400 hover:text-white">Résumé proofs</Link>
       </aside>
       <main className="flex min-h-0 min-w-0 flex-1 flex-col">
         {error && <p role="alert" className="bg-red-900/40 px-5 py-3 text-sm">{error}</p>}

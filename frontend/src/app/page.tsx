@@ -1,5 +1,5 @@
-import ProofWorkspace from "@/components/proof-workspace";
+import ChatLanding from "@/components/chat-landing";
 
 export default function Home() {
-  return <ProofWorkspace />;
+  return <ChatLanding />;
 }
