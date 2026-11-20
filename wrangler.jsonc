@@ -5,6 +5,9 @@
   "observability": {
     "enabled": true
   },
+  "ai": {
+    "binding": "AI"
+  },
   "secrets": {
     "required": [
       "DATABASE_URL",
@@ -33,11 +36,19 @@
       {
         "name": "TAL_CONTAINER",
         "class_name": "TalContainer"
+      },
+      {
+        "name": "TAL_CHAT",
+        "class_name": "TalChatAgent"
       }
     ]
   },
   "exports": {
     "TalContainer": {
+      "type": "durable-object",
+      "storage": "sqlite"
+    },
+    "TalChatAgent": {
       "type": "durable-object",
       "storage": "sqlite"
     }

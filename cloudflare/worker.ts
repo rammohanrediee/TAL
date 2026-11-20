@@ -1,4 +1,8 @@
 import { DurableObject } from "cloudflare:workers";
+import { AIChatAgent } from "@cloudflare/ai-chat";
+import { routeAgentRequest } from "agents/routing";
+import { createAI } from "agents/models/ai-sdk";
+import { convertToModelMessages, pruneMessages, streamText } from "ai";
 
 const PORT = 8000;
 const INACTIVITY_TIMEOUT_MS = 2 * 60 * 1000;
@@ -18,10 +22,72 @@ type RequiredSetting = (typeof REQUIRED_SETTINGS)[number];
 
 interface Env extends Record<RequiredSetting, string> {
   TAL_CONTAINER: DurableObjectNamespace<TalContainer>;
+  TAL_CHAT: DurableObjectNamespace<TalChatAgent>;
+  AI: Ai;
   GOOGLE_CLIENT_ID?: string;
   GOOGLE_CLIENT_SECRET?: string;
   GOOGLE_REDIRECT_URI?: string;
   FRONTEND_URL?: string;
+}
+
+interface ChatClaims {
+  sub: string;
+  cid: string;
+  aud: string;
+  exp: number;
+  iat: number;
+}
+
+function base64UrlBytes(value: string): Uint8Array {
+  const normalized = value.replace(/-/g, "+").replace(/_/g, "/");
+  const binary = atob(normalized.padEnd(Math.ceil(normalized.length / 4) * 4, "="));
+  return Uint8Array.from(binary, (char) => char.charCodeAt(0));
+}
+
+async function verifyChatToken(token: string, secret: string): Promise<ChatClaims | null> {
+  try {
+    const parts = token.split(".");
+    if (parts.length !== 3) return null;
+    const header = JSON.parse(new TextDecoder().decode(base64UrlBytes(parts[0])));
+    if (header.alg !== "HS256" || header.typ !== "JWT") return null;
+    const key = await crypto.subtle.importKey(
+      "raw", new TextEncoder().encode(secret), { name: "HMAC", hash: "SHA-256" }, false, ["verify"],
+    );
+    const valid = await crypto.subtle.verify(
+      "HMAC", key, base64UrlBytes(parts[2]) as BufferSource, new TextEncoder().encode(parts[0] + "." + parts[1]),
+    );
+    if (!valid) return null;
+    const claims = JSON.parse(new TextDecoder().decode(base64UrlBytes(parts[1]))) as ChatClaims;
+    const now = Math.floor(Date.now() / 1000);
+    if (claims.aud !== "tal-chat" || !claims.sub || !claims.cid ||
+        !Number.isInteger(claims.exp) || claims.exp <= now ||
+        !Number.isInteger(claims.iat) || claims.iat > now + 30 ||
+        claims.exp - claims.iat > 60) return null;
+    return claims;
+  } catch {
+    return null;
+  }
+}
+
+export class TalChatAgent extends AIChatAgent<Env> {
+  async onChatMessage() {
+    const ai = createAI({ binding: this.env.AI, gateway: "tal-dev" });
+    const result = streamText({
+      model: ai("@cf/zai-org/glm-4.7-flash"),
+      system: "You are TAL, a concise job-search assistant. Help with career and résumé questions. Do not claim to have analyzed a résumé, job posting, or user's skills unless a verified TAL tool supplied that information. Do not invent qualifications or promise hiring outcomes.",
+      messages: pruneMessages({
+        messages: await convertToModelMessages(this.messages),
+        toolCalls: "before-last-2-messages",
+      }),
+      maxOutputTokens: 800,
+    });
+    return result.toUIMessageStreamResponse();
+  }
+
+  async purge(): Promise<void> {
+    for (const socket of this.ctx.getWebSockets()) socket.close(1008, "Chat deleted");
+    await this.ctx.storage.deleteAll();
+  }
 }
 
 export class TalContainer extends DurableObject<Env> {
@@ -81,7 +147,7 @@ export class TalContainer extends DurableObject<Env> {
 }
 
 export default {
-  fetch(request: Request, env: Env): Promise<Response> | Response {
+  async fetch(request: Request, env: Env): Promise<Response> {
     const missing = REQUIRED_SETTINGS.filter((name) => !env[name]);
     if (missing.length > 0) {
       console.error(`Missing Worker settings: ${missing.join(", ")}`);
@@ -89,6 +155,35 @@ export default {
         status: 503,
       });
     }
-    return env.TAL_CONTAINER.getByName("tal-api").fetch(request);
+    const url = new URL(request.url);
+    if (url.pathname.startsWith("/agents/")) {
+      const check = async (
+        candidate: Request,
+        route: { name: string },
+      ): Promise<Request | Response> => {
+        const origin = candidate.headers.get("Origin");
+        if (origin && (!env.FRONTEND_URL || origin !== new URL(env.FRONTEND_URL).origin)) {
+          return new Response("Forbidden", { status: 403 });
+        }
+        const token = new URL(candidate.url).searchParams.get("token");
+        const claims = token && await verifyChatToken(token, env.JWT_SECRET_KEY);
+        if (!claims || claims.cid !== route.name) {
+          return new Response("Unauthorized", { status: 401 });
+        }
+        return candidate;
+      };
+      return (await routeAgentRequest(request, env, {
+        onBeforeConnect: check,
+        onBeforeRequest: check,
+      })) ?? new Response("Not found", { status: 404 });
+    }
+
+    const response = await env.TAL_CONTAINER.getByName("tal-api").fetch(request);
+    const deletedChat = request.method === "DELETE"
+      && url.pathname.match(/^\/api\/v1\/conversations\/([0-9a-f-]{36})$/i);
+    if (deletedChat && response.status === 204) {
+      await env.TAL_CHAT.getByName(deletedChat[1]).purge();
+    }
+    return response;
   },
 } satisfies ExportedHandler<Env>;

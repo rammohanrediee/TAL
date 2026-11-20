@@ -1,12 +1,19 @@
 {
   "dependencies": {
+    "@ai-sdk/provider": "^4.0.39",
+    "@cloudflare/ai-chat": "^0.12.3",
     "@neon/config": "^1.14.4",
-    "@neon/env": "^2.1.7"
+    "@neon/env": "^2.1.7",
+    "agents": "^0.34.0",
+    "ai": "^7.0.177",
+    "zod": "^4.6.7"
   },
   "scripts": {
     "build": "npm --prefix frontend run build"
   },
   "devDependencies": {
+    "@cloudflare/workers-types": "^5.20261120.1",
+    "typescript": "^7.0.2",
     "wrangler": "^4.165.0"
   }
 }
