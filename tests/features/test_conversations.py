@@ -39,10 +39,10 @@ async def test_conversation_is_owned_and_token_is_scoped() -> None:
     app.dependency_overrides[get_current_user] = current_user
     try:
         with TestClient(app) as client:
-            created = client.post("/api/v1/conversations/")
+            created = client.post("/api/v1/conversations")
             assert created.status_code == 201
             conversation_id = created.json()["id"]
-            assert len(client.get("/api/v1/conversations/").json()) == 1
+            assert len(client.get("/api/v1/conversations").json()) == 1
 
             token_response = client.post(
                 f"/api/v1/conversations/{conversation_id}/connection-token"
@@ -58,7 +58,7 @@ async def test_conversation_is_owned_and_token_is_scoped() -> None:
             assert claims["cid"] == conversation_id
 
             app.dependency_overrides[get_current_user] = lambda: stranger
-            assert client.get("/api/v1/conversations/").json() == []
+            assert client.get("/api/v1/conversations").json() == []
             assert client.post(
                 f"/api/v1/conversations/{conversation_id}/connection-token"
             ).status_code == 404
@@ -66,7 +66,7 @@ async def test_conversation_is_owned_and_token_is_scoped() -> None:
 
             app.dependency_overrides[get_current_user] = current_user
             assert client.delete(f"/api/v1/conversations/{conversation_id}").status_code == 204
-            assert client.get("/api/v1/conversations/").json() == []
+            assert client.get("/api/v1/conversations").json() == []
             assert client.post(
                 f"/api/v1/conversations/{conversation_id}/connection-token"
             ).status_code == 404

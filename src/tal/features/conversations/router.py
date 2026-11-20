@@ -32,7 +32,7 @@ async def owned_conversation(
     return conversation
 
 
-@router.post("/", response_model=ConversationRead, status_code=status.HTTP_201_CREATED)
+@router.post("", response_model=ConversationRead, status_code=status.HTTP_201_CREATED)
 async def create_conversation(
     current_user: Annotated[User, Depends(get_current_user)],
     session: Annotated[AsyncSession, Depends(get_db_session)],
@@ -44,7 +44,7 @@ async def create_conversation(
     return conversation
 
 
-@router.get("/", response_model=list[ConversationRead])
+@router.get("", response_model=list[ConversationRead])
 async def list_conversations(
     current_user: Annotated[User, Depends(get_current_user)],
     session: Annotated[AsyncSession, Depends(get_db_session)],

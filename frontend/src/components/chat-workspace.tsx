@@ -8,7 +8,7 @@ import Link from "next/link";
 
 type Conversation = { id: string; title: string; created_at: string };
 
-async function conversations(path = "/", init?: RequestInit) {
+async function conversations(path = "", init?: RequestInit) {
   const response = await fetch(`/backend/api/v1/conversations${path}`, {
     credentials: "include",
     ...init,
@@ -88,7 +88,7 @@ export default function ChatWorkspace({ host }: { host: string }) {
 
   async function create() {
     try {
-      const item: Conversation = await conversations("/", { method: "POST" });
+      const item: Conversation = await conversations("", { method: "POST" });
       setItems((current) => [item, ...current]);
       setSelected(item.id);
       setError("");
