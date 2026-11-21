@@ -28,6 +28,7 @@ interface Env extends Record<RequiredSetting, string> {
   GOOGLE_CLIENT_SECRET?: string;
   GOOGLE_REDIRECT_URI?: string;
   FRONTEND_URL?: string;
+  CLOUDFLARE_AI_API_TOKEN?: string;
 }
 
 interface ChatClaims {
@@ -135,6 +136,11 @@ export class TalContainer extends DurableObject<Env> {
           ...(this.env.GOOGLE_CLIENT_SECRET && { GOOGLE_CLIENT_SECRET: this.env.GOOGLE_CLIENT_SECRET }),
           ...(this.env.GOOGLE_REDIRECT_URI && { GOOGLE_REDIRECT_URI: this.env.GOOGLE_REDIRECT_URI }),
           ...(this.env.FRONTEND_URL && { FRONTEND_URL: this.env.FRONTEND_URL }),
+          ...(this.env.CLOUDFLARE_AI_API_TOKEN && {
+            EVIDENCE_PROVIDER: "cloudflare",
+            EVIDENCE_MODEL: "@cf/zai-org/glm-4.7-flash",
+            CLOUDFLARE_AI_API_TOKEN: this.env.CLOUDFLARE_AI_API_TOKEN,
+          }),
         },
       });
     }
@@ -193,11 +199,11 @@ export default {
     const attachment = request.method === "POST"
       && url.pathname.match(/^\/api\/v1\/conversations\/([0-9a-f-]{36})\/attachment$/i);
     if (attachment && response.status === 201) {
-      const { text, filename, truncated } = await response.json() as {
-        text: string; filename: string; truncated: boolean;
+      const { text, filename, truncated, resume_id } = await response.json() as {
+        text: string; filename: string; truncated: boolean; resume_id: string;
       };
       await env.TAL_CHAT.getByName(attachment[1]).attachResume(filename, text);
-      return Response.json({ filename, truncated }, { status: 201 });
+      return Response.json({ filename, truncated, resume_id }, { status: 201 });
     }
     const deletedChat = request.method === "DELETE"
       && url.pathname.match(/^\/api\/v1\/conversations\/([0-9a-f-]{36})$/i);

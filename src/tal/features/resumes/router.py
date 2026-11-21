@@ -6,6 +6,8 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, File, UploadFile, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from tal.core.config import get_settings
+from tal.core.errors import DomainError
 from tal.db.session import get_db_session
 from tal.features.auth.dependencies import get_current_user
 from tal.features.auth.entities import User
@@ -45,27 +47,27 @@ async def upload_resume(
         storage,
     )
     try:
-        resume_tasks.process_resume_task.delay(str(resume.id))
-    except Exception:
-        logger.exception(
-            "Task broker unavailable; processing résumé %s inline",
-            resume.id,
-        )
+        await process_resume(resume_id=resume.id, session=session, storage=storage)
+    except DomainError:
+        logger.info("Résumé %s could not be parsed", resume.id)
+    else:
+        if get_settings().evidence_provider != "none":
+            try:
+                resume_tasks.process_resume_task.delay(str(resume.id))
+            except Exception:
+                logger.exception("Evidence queue unavailable for résumé %s", resume.id)
+                try:
+                    await process_resume(
+                        resume_id=resume.id,
+                        session=session,
+                        storage=storage,
+                        evidence_extractor=create_configured_evidence_extractor(),
+                    )
+                except Exception:
+                    await session.rollback()
+                    logger.exception("Optional evidence extraction failed for résumé %s", resume.id)
 
-        try:
-            await process_resume(
-                resume_id=resume.id,
-                session=session,
-                storage=storage,
-                evidence_extractor=create_configured_evidence_extractor(),
-            )
-        except Exception:
-            logger.exception(
-                "Inline processing failed for résumé %s",
-                resume.id,
-            )
-
-    return resume
+    return await get_resume_by_id(resume.id, current_user.id, session)
 
 
 @router.get(

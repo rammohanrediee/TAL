@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@import "shadcn/tailwind.css";
 
 :root {
   --font-geist-sans: Arial, Helvetica, sans-serif;
@@ -67,14 +68,37 @@
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
   --font-display: Georgia, "Times New Roman", serif;
+  --color-background: var(--tal-surface);
+  --color-foreground: var(--tal-ink);
+  --color-muted: var(--tal-subtle);
+  --color-muted-foreground: var(--tal-muted);
+  --color-border: var(--tal-border);
+  --color-input: var(--tal-border);
+  --color-ring: var(--tal-yellow);
+  --color-primary: var(--tal-ink);
+  --color-primary-foreground: var(--tal-surface);
+  --color-secondary: var(--tal-subtle);
+  --color-secondary-foreground: var(--tal-ink);
+  --color-popover: var(--tal-ink);
+  --color-popover-foreground: var(--tal-surface);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
 }
 
 html {
   background: var(--canvas);
+  overflow-x: clip;
 }
 
 body {
   min-height: 100%;
+  overflow-x: clip;
   background: var(--canvas);
   color: var(--ink);
   font-family: var(--font-geist-sans), sans-serif;
@@ -129,6 +153,19 @@ body {
   --tal-warning-soft: #fff3c2;
   --tal-red: #a92f2f;
   --tal-red-soft: #f7e2e2;
+  --sidebar: var(--tal-ink);
+  --sidebar-foreground: var(--tal-surface);
+  --sidebar-primary: var(--tal-yellow);
+  --sidebar-primary-foreground: var(--tal-ink);
+  --sidebar-accent: var(--tal-secondary);
+  --sidebar-accent-foreground: var(--tal-surface);
+  --sidebar-border: var(--tal-secondary);
+  --sidebar-ring: var(--tal-yellow);
+  --chat-ink: var(--tal-ink);
+  --chat-surface: var(--tal-surface);
+  --chat-secondary: var(--tal-secondary);
+  --chat-accent: var(--tal-yellow);
+  --chat-accent-hover: var(--tal-yellow-hover);
 }
 
 @theme inline {

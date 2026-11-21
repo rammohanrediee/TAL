@@ -35,8 +35,9 @@ class Settings(BaseSettings):
     resume_max_upload_bytes: int = 5 * 1024 * 1024
     openai_api_key: SecretStr | None = None
     frontend_url: str = "http://localhost:3000/"
-    evidence_provider: Literal["openai", "ollama", "neon"] = "openai"
+    evidence_provider: Literal["none", "openai", "ollama", "neon", "cloudflare"] = "none"
     evidence_model: str = "gpt-5-mini"
+    cloudflare_ai_api_token: SecretStr | None = None
     ollama_base_url: str = "http://localhost:11434/v1"
     neon_ai_gateway_base_url: str | None = None
     neon_ai_gateway_token: SecretStr | None = None

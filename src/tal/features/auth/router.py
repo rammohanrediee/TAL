@@ -31,6 +31,7 @@ async def register(
 async def issue_access_token(
     form_data: Annotated[OAuth2PasswordRequestForm, Depends()],
     session: Annotated[AsyncSession, Depends(get_db_session)],
+    response: Response,
 ) -> TokenResponse:
     user = await authenticate_user(
         email=form_data.username,
@@ -38,6 +39,15 @@ async def issue_access_token(
         session=session,
     )
     token = create_access_token(user.id)
+    response.set_cookie(
+        key="tal_access_token",
+        value=token,
+        httponly=True,
+        secure=settings.app_env == "production",
+        samesite="lax",
+        path="/",
+        max_age=settings.access_token_expire_minutes * 60,
+    )
     return TokenResponse(access_token=token)
 
 
@@ -90,7 +100,7 @@ async def google_callback(
     )
     tal_access_token = create_access_token(user.id)
     redirect_response = RedirectResponse(
-        url=settings.frontend_url,
+        url=f"{settings.frontend_url.rstrip('/')}/chat",
         status_code=status.HTTP_303_SEE_OTHER,
     )
     redirect_response.set_cookie(

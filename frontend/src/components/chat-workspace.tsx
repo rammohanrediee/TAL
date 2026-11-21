@@ -2,11 +2,109 @@
 
 import { useAgent } from "agents/react";
 import { useAgentChat } from "@cloudflare/ai-chat/react";
-import { FormEvent, useEffect, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import Link from "next/link";
+import { MessageScroller, MessageScrollerButton, MessageScrollerContent, MessageScrollerItem, MessageScrollerProvider, MessageScrollerViewport } from "@/components/ui/message-scroller";
+import { Message, MessageContent } from "@/components/ui/message";
+import { Bubble, BubbleContent } from "@/components/ui/bubble";
+import { ChatComposerAttachButton, ChatComposerAttachments, ChatComposerFooter, ChatComposerFrame, ChatComposerHeader, ChatComposerInput, ChatComposerSubmit, LocalChatComposerProvider } from "@/components/ui/chat-composer";
+import { TooltipProvider } from "@/components/ui/tooltip";
+import { ChatSidebar as ChatcnSidebar, ChatSidebarAccount, type ChatThread } from "@/components/ui/chat-sidebar";
+import { ArrowRight, LogOut, PanelLeft, X } from "lucide-react";
+import styles from "./chat-workspace.module.css";
 
 type Conversation = { id: string; title: string; created_at: string };
+type CurrentUser = { id: string; email: string; is_active: boolean };
+
+function subscribeMobile(callback: () => void) {
+  const media = window.matchMedia("(max-width: 767px)");
+  media.addEventListener("change", callback);
+  return () => media.removeEventListener("change", callback);
+}
+
+function isMobileScreen() {
+  return window.matchMedia("(max-width: 767px)").matches;
+}
+
+function ChatSidebar({ items, selected, onCreate, onSelect, onRemove, loading, error, onRetry, user, onLogout }: {
+  items: Conversation[];
+  selected: string | null;
+  onCreate: () => Promise<void>;
+  onSelect: (id: string) => void;
+  onRemove: (id: string) => Promise<void>;
+  loading: boolean;
+  error: boolean;
+  onRetry: () => void;
+  user: CurrentUser;
+  onLogout: () => Promise<void>;
+}) {
+  const mobile = useSyncExternalStore(subscribeMobile, isMobileScreen, () => false);
+  const [mobileOpen, setMobileOpen] = useState(false);
+  const [collapsed, setCollapsed] = useState(false);
+  const [accountOpen, setAccountOpen] = useState(false);
+  const [accountError, setAccountError] = useState("");
+  const shellRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!accountOpen) return;
+    const onPointerDown = (event: PointerEvent) => {
+      if (!shellRef.current?.contains(event.target as Node)) setAccountOpen(false);
+    };
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setAccountOpen(false);
+    };
+    document.addEventListener("pointerdown", onPointerDown);
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("pointerdown", onPointerDown);
+      document.removeEventListener("keydown", onKeyDown);
+    };
+  }, [accountOpen]);
+  const name = user.email.split("@")[0] || user.email;
+  const threads: ChatThread[] = items.map((item) => ({
+    id: item.id,
+    title: item.title,
+    updatedAt: item.created_at,
+  }));
+
+  return (
+    <>
+      {mobile && mobileOpen && <button type="button" className={styles.sidebarBackdrop} aria-label="Close sidebar" onClick={() => setMobileOpen(false)} />}
+      <div ref={shellRef} className={`${styles.sidebarShell} ${mobileOpen ? styles.sidebarShellOpen : ""}`}>
+        <ChatcnSidebar
+          threads={threads}
+          activeId={selected}
+          onNewChat={() => { setMobileOpen(false); void onCreate(); }}
+          onSelect={(id) => { onSelect(id); setMobileOpen(false); }}
+          onDelete={(id) => { void onRemove(id); }}
+          collapsed={mobile ? false : collapsed}
+          onCollapsedChange={(next) => { if (mobile) setMobileOpen(!next); else setCollapsed(next); }}
+          loading={loading}
+          error={error}
+          onRetry={onRetry}
+          resizable={!mobile}
+          brand={<Link href="/" className={styles.brand} title="TAL home"><span className={styles.brandTile}>T</span><span>TAL</span></Link>}
+          footer={<ChatSidebarAccount name={name} detail={user.email} aria-expanded={accountOpen} aria-haspopup="dialog" onClick={() => setAccountOpen((open) => !open)} />}
+          railFooter={<ChatSidebarAccount name={name} detail={user.email} compact aria-expanded={accountOpen} aria-haspopup="dialog" onClick={() => setAccountOpen((open) => !open)} />}
+          className={styles.chatcnSidebar}
+        />
+        {accountOpen && (
+          <div className={styles.accountPopup} role="dialog" aria-label="Your account">
+            <div className={styles.accountPopupHeader}>
+              <span className={styles.accountAvatar} aria-hidden="true">{name.slice(0, 2).toUpperCase()}</span>
+              <div className={styles.accountIdentity}><strong>{name}</strong><span title={user.email}>{user.email}</span></div>
+              <button type="button" className={styles.accountClose} aria-label="Close account menu" onClick={() => setAccountOpen(false)}><X aria-hidden="true" size={18} /></button>
+            </div>
+            <div className={styles.accountPopupActions}>
+              <button type="button" className={styles.accountLogout} onClick={() => { void onLogout().catch(() => setAccountError("Could not log out. Try again.")); }}><LogOut aria-hidden="true" size={18} />Log out</button>
+              {accountError && <p role="alert" className={styles.accountError}>{accountError}</p>}
+            </div>
+          </div>
+        )}
+      </div>
+      <button type="button" className={styles.mobileSidebarTrigger} aria-label="Open sidebar" aria-expanded={mobileOpen} onClick={() => setMobileOpen(true)}><PanelLeft aria-hidden="true" size={20} /></button>
+    </>
+  );
+}
 
 async function conversations(path = "", init?: RequestInit) {
   const response = await fetch(`/backend/api/v1/conversations${path}`, {
@@ -18,21 +116,66 @@ async function conversations(path = "", init?: RequestInit) {
   return response.status === 204 ? null : response.json();
 }
 
-function ConversationView({ id, host }: { id: string; host: string }) {
-  const [input, setInput] = useState("");
+function TalComposer({ id, onSend, disabled = false, attachedName }: {
+  id: string;
+  onSend: (text: string, file: File | null) => Promise<void>;
+  disabled?: boolean;
+  attachedName?: string;
+}) {
+  const [error, setError] = useState("");
+
+  return (
+    <div className={styles.composerDock}>
+      {error && <p role="alert" className={styles.error}>{error}</p>}
+      <div className={styles.composerForm}>
+        <LocalChatComposerProvider
+          disabled={disabled}
+          onSubmit={async ({ value, attachments }) => {
+            const file = attachments[0]?.file ?? null;
+            if (attachments.length > 1) {
+              setError("Attach one résumé at a time.");
+              throw new Error("Too many attachments");
+            }
+            if (file && file.size > 5 * 1024 * 1024) {
+              setError("Résumé must be 5 MB or smaller.");
+              throw new Error("Attachment too large");
+            }
+            try {
+              await onSend(value, file);
+              setError("");
+            } catch (caught) {
+              setError(caught instanceof Error ? caught.message : "Could not send your message.");
+              throw caught;
+            }
+          }}
+        >
+          <ChatComposerFrame className={styles.composer}>
+            <ChatComposerHeader className={styles.composerHeader}>
+              <label htmlFor={id} className={styles.composerLabel}>Your message</label>
+            </ChatComposerHeader>
+            <ChatComposerInput id={id} maxLength={4000} rows={3} placeholder="Ask TAL about a role, your résumé, or your next move…" className={styles.composerInput} />
+            <ChatComposerAttachments className={styles.attachmentList} />
+            {attachedName && <p className={styles.attachment}>Résumé attached · {attachedName}</p>}
+            <ChatComposerFooter className={styles.composerActions}>
+              <ChatComposerAttachButton accept=".pdf,.docx" label="Attach PDF or DOCX résumé" className={styles.attachButton} />
+              <span className={styles.composerHint}>Enter to send · Shift+Enter for a new line</span>
+              <ChatComposerSubmit className={styles.sendButton}>Send →</ChatComposerSubmit>
+            </ChatComposerFooter>
+          </ChatComposerFrame>
+        </LocalChatComposerProvider>
+      </div>
+    </div>
+  );
+}
+
+function ConnectedConversationView({ id, host, token }: { id: string; host: string; token: string }) {
   const [connected, setConnected] = useState(false);
-  const [uploading, setUploading] = useState(false);
   const [attachment, setAttachment] = useState("");
-  const [attachmentError, setAttachmentError] = useState("");
-  const picker = useRef<HTMLInputElement>(null);
   const agent = useAgent({
     agent: "TalChatAgent",
     name: id,
     host,
-    query: async () => {
-      const { token } = await conversations(`/${id}/connection-token`, { method: "POST" });
-      return { token };
-    },
+    query: async () => ({ token }),
     queryDeps: [id],
     cacheTtl: 0,
     onOpen: () => setConnected(true),
@@ -49,14 +192,9 @@ function ConversationView({ id, host }: { id: string; host: string }) {
     sendMessage({ text: pending });
   }, [connected, id, sendMessage, status]);
 
-  async function attach(file: File) {
-    if (file.size > 5 * 1024 * 1024) {
-      setAttachmentError("Résumé must be 5 MB or smaller.");
-      return;
-    }
-    setUploading(true);
-    setAttachmentError("");
-    try {
+  async function send(text: string, file: File | null) {
+    if (!connected || status !== "ready") throw new Error("TAL is still connecting. Try again shortly.");
+    if (file) {
       const body = new FormData();
       body.append("file", file);
       const response = await fetch(`/backend/api/v1/conversations/${id}/attachment`, {
@@ -68,124 +206,219 @@ function ConversationView({ id, host }: { id: string; host: string }) {
       }
       const { filename } = await response.json() as { filename: string };
       setAttachment(filename);
-    } catch (caught) {
-      setAttachmentError(caught instanceof Error ? caught.message : "Could not attach that résumé.");
-    } finally {
-      setUploading(false);
     }
-  }
-
-  function submit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const text = input.trim();
-    if (!connected || (!text && !attachment) || uploading || status === "streaming" || status === "submitted") return;
-    sendMessage({ text: text || "What should I know about my attached résumé?" });
-    setInput("");
+    await Promise.resolve(sendMessage({ text: text || "What should I know about my attached résumé?" }));
   }
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col">
-      <div className="flex-1 space-y-5 overflow-y-auto px-5 py-8 sm:px-10">
+    <div className={styles.conversation}>
+      <div className={styles.conversationHeader}>
+        <div><p className={styles.eyebrow}>TAL / Conversation</p><h1>Ask with context.</h1></div>
+        <span className={styles.connectionStatus} data-connected={connected}>{connected ? "Connected" : "Connecting"}</span>
+      </div>
+      <MessageScrollerProvider autoScroll>
+      <MessageScroller className={styles.scroller}>
+      <MessageScrollerViewport>
+        <MessageScrollerContent className={styles.thread}>
         {messages.length === 0 && (
-          <p className="mx-auto max-w-2xl text-sm text-neutral-500">
-            Ask about your job search, or attach a résumé for a grounded answer.
-          </p>
+          <div className={styles.emptyState}>
+            <p className={styles.eyebrow}>A place to start</p>
+            <h2>What would you like to work through?</h2>
+            <p>Ask about your job search. Attach a résumé when you want an answer grounded in your experience.</p>
+          </div>
         )}
         {messages.map((message) => (
-          <div key={message.id} className={message.role === "user" ? "ml-auto max-w-2xl rounded-2xl bg-neutral-800 p-4" : "max-w-2xl p-4"}>
-            <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-yellow-400">{message.role === "user" ? "You" : "TAL"}</p>
-            {message.parts.map((part, index) => part.type === "text" ? (
-              <p key={index} className="whitespace-pre-wrap text-sm leading-7">{part.text}</p>
-            ) : null)}
-          </div>
+          <MessageScrollerItem key={message.id} messageId={message.id} scrollAnchor={message.role === "user"}>
+            <Message align={message.role === "user" ? "end" : "start"}>
+              <MessageContent>
+                <Bubble align={message.role === "user" ? "end" : "start"} variant={message.role === "user" ? "muted" : "ghost"} className={message.role === "user" ? styles.userMessage : styles.assistantMessage}>
+                  <BubbleContent className={styles.bubbleContent}>
+                    <p className={styles.messageAuthor}>{message.role === "user" ? "You" : "TAL"}</p>
+                    {message.parts.map((part, index) => part.type === "text" ? (
+                      <p key={index} className={styles.messageText}>{part.text}</p>
+                    ) : null)}
+                  </BubbleContent>
+                </Bubble>
+              </MessageContent>
+            </Message>
+          </MessageScrollerItem>
         ))}
+        {status === "submitted" && <p className={styles.replyStatus} role="status">TAL is preparing a reply…</p>}
+        </MessageScrollerContent>
+      </MessageScrollerViewport>
+      <MessageScrollerButton />
+      </MessageScroller>
+      </MessageScrollerProvider>
+      {status === "error" && <p role="alert" className={styles.error}>TAL could not reply. Try sending your message again.</p>}
+      <TalComposer id="chat-message" onSend={send} disabled={!connected || status !== "ready"} attachedName={attachment} />
+    </div>
+  );
+}
+
+function ConversationView({ id, host }: { id: string; host: string }) {
+  const [token, setToken] = useState<string | null>(null);
+  const [failed, setFailed] = useState(false);
+  const [attempt, setAttempt] = useState(0);
+
+  useEffect(() => {
+    let active = true;
+    conversations(`/${id}/connection-token`, { method: "POST" })
+      .then((result: { token: string }) => { if (active) { setToken(result.token); setFailed(false); } })
+      .catch(() => { if (active) setFailed(true); });
+    return () => { active = false; };
+  }, [id, attempt]);
+
+  if (token) return <ConnectedConversationView id={id} host={host} token={token} />;
+
+  const pending = typeof window === "undefined" ? "" : sessionStorage.getItem(`tal:pending:${id}`) ?? "";
+  return (
+    <div className={styles.startView}>
+      <div className={styles.noConversation}>
+        <p className={styles.eyebrow}>Your conversation</p>
+        <h1>{failed ? "TAL could not connect." : "Connecting to TAL…"}</h1>
+        <p>{failed ? "Your message is saved. Retry when the connection is available." : "Your message will send when the connection is ready."}</p>
       </div>
-      {status === "error" && <p role="alert" className="px-5 text-sm text-red-300">TAL could not reply. You can send another message.</p>}
-      {attachmentError && <p role="alert" className="px-5 text-sm text-red-300">{attachmentError}</p>}
-      {attachment && <p className="px-5 text-xs text-neutral-400">Attached: {attachment}</p>}
-      <form onSubmit={submit} className="flex gap-3 border-t border-white/10 p-4 sm:p-6">
-        <input ref={picker} type="file" accept=".pdf,.docx" className="sr-only" aria-label="Attach a PDF or DOCX résumé"
-          onChange={(event) => { const file = event.target.files?.[0]; if (file) void attach(file); event.target.value = ""; }} />
-        <button type="button" onClick={() => picker.current?.click()} disabled={uploading}
-          aria-label="Attach résumé" title="Attach PDF or DOCX résumé"
-          className="rounded-xl border border-white/20 px-3 text-yellow-400 disabled:opacity-40">{uploading ? "…" : "+"}</button>
-        <label htmlFor="chat-message" className="sr-only">Message TAL</label>
-        <input id="chat-message" value={input} onChange={(event) => setInput(event.target.value)}
-          maxLength={4000} placeholder="Ask TAL about your job search"
-          className="min-w-0 flex-1 rounded-xl border border-white/20 bg-neutral-900 px-4 py-3 text-sm outline-none focus:border-yellow-400" />
-        <button type="submit" disabled={!connected || (!input.trim() && !attachment) || uploading || status === "streaming" || status === "submitted"}
-          className="rounded-xl bg-yellow-400 px-5 py-3 font-semibold text-black disabled:opacity-40">
-          Send
-        </button>
-      </form>
+      {pending && <p className={styles.pendingMessage}>Saved message: {pending}</p>}
+      {failed && <button type="button" className={styles.retryButton} onClick={() => { setFailed(false); setAttempt((value) => value + 1); }}>Retry connection</button>}
+      <TalComposer id="pending-chat-message" disabled onSend={async () => {}} />
+    </div>
+  );
+}
+
+function StartConversationView({ onStart }: { onStart: (text: string, file: File | null) => Promise<boolean> }) {
+  return (
+    <div className={styles.startView}>
+      <div className={styles.noConversation}>
+        <p className={styles.eyebrow}>Your workspace</p>
+        <h1>A conversation starts here.</h1>
+        <p>Ask TAL about your job search, or attach a résumé for an answer grounded in your experience.</p>
+      </div>
+      <TalComposer id="new-chat-message" onSend={async (text, file) => {
+        const started = await onStart(text, file);
+        if (!started) throw new Error("Could not create a chat. Please try again.");
+      }} />
     </div>
   );
 }
 
 export default function ChatWorkspace({ host }: { host: string }) {
-  const router = useRouter();
+  const [user, setUser] = useState<CurrentUser | null>(null);
+  const [authState, setAuthState] = useState<"checking" | "signed-out" | "unavailable" | "signed-in">("checking");
+  const [authAttempt, setAuthAttempt] = useState(0);
   const [items, setItems] = useState<Conversation[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [sidebarError, setSidebarError] = useState(false);
   const [selected, setSelected] = useState<string | null>(null);
   const [error, setError] = useState("");
+  const urlConversation = useSyncExternalStore(
+    () => () => {},
+    () => new URLSearchParams(window.location.search).get("conversation"),
+    () => null,
+  );
+  const activeConversation = selected ?? urlConversation;
 
   useEffect(() => {
-    conversations().then((loaded: Conversation[]) => {
-      setItems(loaded);
-      const initial = new URLSearchParams(window.location.search).get("conversation");
-      if (initial && loaded.some((item) => item.id === initial)) setSelected(initial);
-    }).catch((failure) => {
-      if (failure.message === "signed-out") router.replace("/login");
-      else setError("Could not load your chats.");
-    });
-  }, [router]);
+    const controller = new AbortController();
+    fetch("/backend/api/v1/auth/me", { credentials: "include", signal: controller.signal })
+      .then(async (response) => {
+        if (response.status === 401) { setAuthState("signed-out"); return; }
+        if (!response.ok) throw new Error("Could not check sign-in status");
+        setUser(await response.json() as CurrentUser);
+        setAuthState("signed-in");
+      })
+      .catch(() => { if (!controller.signal.aborted) setAuthState("unavailable"); });
+    return () => controller.abort();
+  }, [authAttempt]);
 
-  async function create() {
+  async function loadConversations() {
+    setLoading(true);
+    setSidebarError(false);
+    try {
+      const loaded = await conversations() as Conversation[];
+      setItems(loaded);
+    } catch (failure) {
+      if (failure instanceof Error && failure.message === "signed-out") { setUser(null); setAuthState("signed-out"); }
+      else setSidebarError(true);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    if (!user) return;
+    queueMicrotask(() => { void loadConversations(); });
+  }, [user]);
+
+  async function start(text = "", file: File | null = null): Promise<boolean> {
     try {
       const item: Conversation = await conversations("", { method: "POST" });
+      if (file) {
+        const body = new FormData();
+        body.append("file", file);
+        const uploaded = await fetch(`/backend/api/v1/conversations/${item.id}/attachment`, { method: "POST", credentials: "include", body });
+        if (!uploaded.ok) throw new Error("Could not attach that résumé.");
+      }
+      if (text || file) sessionStorage.setItem(`tal:pending:${item.id}`, text || "What should I know about my attached résumé?");
       setItems((current) => [item, ...current]);
       setSelected(item.id);
       setError("");
-    } catch {
-      setError("Could not create a chat.");
+      return true;
+    } catch (failure) {
+      if (failure instanceof Error && failure.message === "signed-out") { setUser(null); setAuthState("signed-out"); return false; }
+      if (!text && !file) setError("Could not create a chat. Please try again.");
+      return false;
     }
   }
+
+  async function create() { await start(); }
 
   async function remove(id: string) {
     try {
       await conversations(`/${id}`, { method: "DELETE" });
       setItems((current) => current.filter((item) => item.id !== id));
-      if (selected === id) setSelected(null);
+      if (activeConversation === id) setSelected("");
       setError("");
     } catch {
       setError("Could not delete the chat. Try again.");
     }
   }
 
-  return (
-    <div className="flex h-screen flex-col bg-neutral-950 text-white sm:flex-row">
-      <aside className="flex max-h-48 w-full shrink-0 flex-col border-b border-white/10 p-4 sm:max-h-none sm:w-64 sm:border-b-0 sm:border-r">
-        <Link href="/" className="mb-8 text-xl font-bold text-yellow-400">TAL</Link>
-        <button onClick={create} className="rounded-xl bg-yellow-400 px-4 py-3 text-left font-semibold text-black">+ New chat</button>
-        <div className="mt-5 flex-1 space-y-1 overflow-y-auto">
-          {items.map((item) => (
-            <div key={item.id} className="flex items-center gap-1">
-              <button onClick={() => setSelected(item.id)} className={`min-w-0 flex-1 truncate rounded-lg px-3 py-2 text-left text-sm hover:bg-white/10 ${selected === item.id ? "bg-white/10" : ""}`}>
-                {item.title} · {new Date(item.created_at).toLocaleDateString()}
-              </button>
-              <button onClick={() => remove(item.id)} aria-label="Delete chat" title="Delete chat" className="px-2 text-neutral-400 hover:text-white">×</button>
-            </div>
-          ))}
+  async function logout() {
+    const response = await fetch("/backend/api/v1/auth/logout", { method: "POST", credentials: "include" });
+    if (!response.ok) throw new Error("Could not log out");
+    setUser(null);
+    setAuthState("signed-out");
+    setItems([]);
+    setSelected(null);
+  }
+
+  if (authState !== "signed-in" || !user) {
+    return (
+      <main className={styles.authGate}>
+        <Link href="/" className={styles.authBrand}><span className={styles.brandTile}>T</span>TAL</Link>
+        <div className={styles.authDialog} role="dialog" aria-label="Sign in to TAL">
+          <p className={styles.eyebrow}>TAL / Chat</p>
+          <h1>{authState === "checking" ? "Checking your account…" : authState === "unavailable" ? "We couldn’t reach TAL." : "Please sign in."}</h1>
+          <p>{authState === "checking" ? "Your chats will appear in a moment." : authState === "unavailable" ? "Check your connection and try again." : "Sign in to see your conversations and start a new chat."}</p>
+          {authState === "signed-out" && <Link href="/login" className={styles.signInButton}>Sign in <ArrowRight aria-hidden="true" size={18} /></Link>}
+          {authState === "unavailable" && <button type="button" className={styles.signInButton} onClick={() => { setAuthState("checking"); setAuthAttempt((attempt) => attempt + 1); }}>Retry <ArrowRight aria-hidden="true" size={18} /></button>}
         </div>
-        <Link href="/proofs" className="text-sm text-neutral-400 hover:text-white">Résumé proofs</Link>
-      </aside>
-      <main className="flex min-h-0 min-w-0 flex-1 flex-col">
-        {error && <p role="alert" className="bg-red-900/40 px-5 py-3 text-sm">{error}</p>}
-        {selected ? <ConversationView key={selected} id={selected} host={host} /> : (
-          <div className="flex flex-1 items-center justify-center p-6 text-center text-neutral-400">
-            Start a chat or reopen one from the sidebar.
-          </div>
-        )}
+      </main>
+    );
+  }
+
+  return (
+    <TooltipProvider>
+    <div className={styles.workspace}>
+      <ChatSidebar items={items} selected={activeConversation} onCreate={create} onSelect={setSelected} onRemove={remove} loading={loading} error={sidebarError} onRetry={() => { void loadConversations(); }} user={user} onLogout={logout} />
+      <main className={styles.main}>
+        <div className={styles.topBar}>
+          <span>Workspace / Chat</span>
+        </div>
+        {error && <p role="alert" className={styles.error}>{error}</p>}
+        {activeConversation ? <ConversationView key={activeConversation} id={activeConversation} host={host} /> : <StartConversationView onStart={start} />}
       </main>
     </div>
+    </TooltipProvider>
   );
 }

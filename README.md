@@ -202,6 +202,21 @@ Google sign-in also needs the deployed frontend URL in Cloudflare's
 `FRONTEND_URL` and the matching `/backend/api/v1/auth/google/callback` URL in
 `GOOGLE_REDIRECT_URI` and Google Cloud Console.
 
+## Résumé processing and optional AI
+
+Apply the database migrations before deploying the updated Cloudflare Worker and
+Vercel frontend. A résumé attached in chat is stored in R2, parsed into source
+blocks, and associated with its conversation by the Python backend. Standalone
+résumé uploads also parse their source blocks in the API request. These core
+paths do not require Redis, an embedding model, or an AI API token.
+
+Structured evidence extraction is optional. To run it through Workers AI, set
+`CLOUDFLARE_AI_API_TOKEN` as a Worker secret with Workers AI access; the Worker
+passes `EVIDENCE_PROVIDER=cloudflare` and the GLM model to its Python container.
+The chat response model uses the Worker's `AI` binding independently. If the
+optional evidence provider is not configured, uploaded source blocks remain
+available to TAL and the chat context contains their extracted text.
+
 ## Quality checks
 
 Backend checks:

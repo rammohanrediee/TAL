@@ -14,6 +14,9 @@ class Conversation(Base):
     user_id: Mapped[UUID] = mapped_column(
         Uuid, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
     )
+    resume_id: Mapped[UUID | None] = mapped_column(
+        Uuid, ForeignKey("resumes.id", ondelete="SET NULL"), nullable=True
+    )
     title: Mapped[str] = mapped_column(String(120), default="New chat", nullable=False)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=lambda: datetime.now(UTC), nullable=False

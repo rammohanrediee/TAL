@@ -3,6 +3,7 @@ from io import BytesIO
 from zipfile import BadZipFile
 
 from docx import Document as DocxDocument
+from docx.opc.exceptions import PackageNotFoundError
 from pypdf import PdfReader
 from pypdf.errors import PdfReadError
 
@@ -62,7 +63,7 @@ def extract_docx(data:bytes)->ExtractedDocument:
     try:
             
         document=DocxDocument(BytesIO(data))
-    except BadZipFile as exc:
+    except (BadZipFile, PackageNotFoundError, AttributeError) as exc:
         raise ResumeExtractionError() from exc
     blocks:list[ExtractedBlock]=[]
 

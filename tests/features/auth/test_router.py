@@ -81,6 +81,23 @@ def test_register_rejects_duplicate_email(client: TestClient) -> None:
     }
 
 
+def test_password_sign_in_sets_chat_session_cookie(client: TestClient) -> None:
+    client.post(
+        "/api/v1/auth/register",
+        json={"email": "buddy@example.com", "password": "securepass123"},
+    )
+
+    response = client.post(
+        "/api/v1/auth/token",
+        data={"username": "buddy@example.com", "password": "securepass123"},
+    )
+
+    assert response.status_code == 200
+    assert "tal_access_token=" in response.headers["set-cookie"]
+    assert "httponly" in response.headers["set-cookie"].lower()
+    assert client.get("/api/v1/auth/me").json()["email"] == "buddy@example.com"
+
+
 @pytest.mark.parametrize(
     "payload",
     [
@@ -134,7 +151,7 @@ def test_google_callback_redirects_with_tal_session_cookie(
     assert callback_response.status_code == 303
     assert (
         callback_response.headers["location"]
-        == "http://localhost:3000/"
+        == "http://localhost:3000/chat"
     )
 
     set_cookie = callback_response.headers["set-cookie"].lower()

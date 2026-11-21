@@ -64,7 +64,6 @@ export default function ChatLanding() {
       <header className="flex min-h-16 items-center justify-between border-b border-tal-border bg-white px-4 sm:px-6">
         <Link href="/" className="flex items-center gap-3 text-xl font-bold"><span className="grid size-9 place-items-center rounded-xl bg-tal-yellow text-base">T</span>TAL</Link>
         <nav className="flex items-center gap-4 text-sm font-semibold">
-          <Link href="/proofs" className="hover:underline">Résumé proofs</Link>
           <Link href={signedIn ? "/chat" : "/login"} className="rounded-xl bg-tal-ink px-4 py-3 text-white">{signedIn ? "Your chats" : "Sign in"}</Link>
         </nav>
       </header>

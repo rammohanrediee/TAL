@@ -1,10 +1,12 @@
 from collections.abc import AsyncIterator
 from io import BytesIO
+from types import SimpleNamespace
 from typing import Any
 from uuid import UUID
 from zipfile import ZIP_DEFLATED, ZipFile
 
 import pytest
+from docx import Document
 from fastapi.testclient import TestClient
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import (
@@ -45,6 +47,8 @@ class FakeStorage:
                 "content_type": content_type,
             }
         )
+    async def download(self, *, storage_key: str) -> bytes:
+        return next(item["data"] for item in self.uploads if item["storage_key"] == storage_key)
     async def delete(
             self,
             *,
@@ -198,7 +202,7 @@ def test_upload_pdf_creates_resume(
     assert data["original_filename"] == "resume.pdf"
     assert data["content_type"] == "application/pdf"
     assert data["size_bytes"] == len(pdf_bytes)
-    assert data["status"] == "uploaded"
+    assert data["status"] == "failed"
     assert data["id"]
     assert data["created_at"]
     assert data["updated_at"]
@@ -249,7 +253,7 @@ def test_upload_docx_creates_resume(
     assert data["original_filename"] == "resume.docx"
     assert data["content_type"] == docx_content_type
     assert data["size_bytes"] == len(docx_bytes)
-    assert data["status"] == "uploaded"
+    assert data["status"] == "failed"
 
     assert len(fake_storage.uploads) == 1
 
@@ -391,26 +395,31 @@ def test_delete_resume_removes_stored_object(
 
 
 
-def test_successful_upload_queues_resume_processing(
+def test_successful_upload_parses_resume_without_queue(
     client: TestClient,
     queued_resume_ids: list[str],
 ) -> None:
-    pdf_bytes = b"%PDF-1.4\nsample resume content"
+    document = Document()
+    document.add_paragraph("Built a scheduling service for 20 teams.")
+    buffer = BytesIO()
+    document.save(buffer)
+    docx_bytes = buffer.getvalue()
 
     response = client.post(
         "/api/v1/resumes/",
         files={
             "file": (
-                "resume.pdf",
-                pdf_bytes,
-                "application/pdf",
+                "resume.docx",
+                docx_bytes,
+                "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
             )
         },
     )
     data = response.json()
 
     assert response.status_code == 201
-    assert queued_resume_ids == [data["id"]]
+    assert data["status"] == "ready"
+    assert queued_resume_ids == []
 
 
 def test_get_resume_returns_status_for_owner(
@@ -435,9 +444,9 @@ def test_get_resume_returns_status_for_owner(
 
     assert response.status_code == 200
     assert data["id"] == resume_id
-    assert data["status"] == "uploaded"
+    assert data["status"] == "failed"
 
-def test_upload_succeeds_when_queue_and_inline_processing_fail(
+def test_upload_record_survives_inline_processing_failure(
     client: TestClient,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -500,6 +509,11 @@ def test_inline_processing_injects_configured_evidence_extractor(
     )
     monkeypatch.setattr(
         resume_router,
+        "get_settings",
+        lambda: SimpleNamespace(evidence_provider="cloudflare"),
+    )
+    monkeypatch.setattr(
+        resume_router,
         "process_resume",
         capture_processing,
     )
@@ -516,9 +530,9 @@ def test_inline_processing_injects_configured_evidence_extractor(
     )
 
     assert response.status_code == 201
-    assert len(processing_calls) == 1
+    assert len(processing_calls) == 2
 
-    call = processing_calls[0]
+    call = processing_calls[1]
     assert call["resume_id"] == UUID(response.json()["id"])
     assert call["storage"] is fake_storage
     assert call["evidence_extractor"] is evidence_extractor

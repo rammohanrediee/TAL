@@ -6,6 +6,7 @@ from tal.features.resumes.entities import Resume, ResumeTextBlock
 from tal.features.resumes.errors import (
     ResumeExtractionError,
     ResumeNotFoundError,
+    ResumeTextNotFoundError,
 )
 from tal.features.resumes.evidence_extraction import (
     EvidenceExtractor,
@@ -54,7 +55,7 @@ async def process_resume(
         resume_id:UUID,
         session:AsyncSession,
         storage:StorageBackend,
-        evidence_extractor:EvidenceExtractor,
+        evidence_extractor:EvidenceExtractor | None = None,
 )->None:
     resume=await session.get(Resume,resume_id)
 
@@ -62,7 +63,12 @@ async def process_resume(
         raise ResumeNotFoundError()
 
     if resume.status==ResumeStatus.READY:
-        return 
+        if evidence_extractor is not None:
+            await extract_resume_evidence(
+                resume_id=resume.id, extractor=evidence_extractor, session=session
+            )
+            await session.commit()
+        return
 
     storage_key=resume.storage_key
     content_type=resume.content_type
@@ -82,7 +88,7 @@ async def process_resume(
         else:
             raise ResumeExtractionError()
 
-    except ResumeExtractionError:
+    except (ResumeExtractionError, ResumeTextNotFoundError):
         resume.status = ResumeStatus.FAILED
         await session.commit()
         raise
@@ -92,10 +98,12 @@ async def process_resume(
         document=document,
         session=session,
     )
-    await extract_resume_evidence(
-        resume_id=resume.id,
-        extractor=evidence_extractor,
-        session=session,
-    )
     resume.status=ResumeStatus.READY
     await session.commit()
+    if evidence_extractor is not None:
+        await extract_resume_evidence(
+            resume_id=resume.id,
+            extractor=evidence_extractor,
+            session=session,
+        )
+        await session.commit()
