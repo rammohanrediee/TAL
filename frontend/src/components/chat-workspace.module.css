@@ -84,6 +84,11 @@
 .sendButton:active:not(:disabled) { transform: translateY(1px); }
 .sendButton:focus-visible, .attachButton:focus-visible, .brand:focus-visible { outline: 2px solid var(--chat-accent); outline-offset: 3px; }
 .topBar { display: flex; min-height: 52px; align-items: center; gap: 12px; padding: 0 18px; border-bottom: 1px solid var(--chat-border); background: var(--chat-surface); color: var(--chat-secondary); font-size: 12px; font-weight: 700; }
+.jobsNav, .jobsRail { display: flex; align-items: center; gap: 11px; min-height: 42px; padding: 0 12px; border-radius: 8px; color: var(--tal-surface); font-size: 13px; font-weight: 750; }
+.jobsNav:hover, .jobsRail:hover { background: var(--tal-secondary); }
+.jobsNav[aria-current="page"], .jobsRail[aria-current="page"] { background: var(--tal-secondary); color: var(--tal-yellow); }
+.jobsRail { justify-content: center; padding: 0; }
+.topBarLink { margin-left: auto; color: var(--tal-ink); text-decoration: underline; text-underline-offset: 3px; }
 
 .main, .conversation { display: flex; min-width: 0; min-height: 0; flex: 1; flex-direction: column; }
 .startView { display: flex; min-width: 0; min-height: 0; flex: 1; flex-direction: column; }

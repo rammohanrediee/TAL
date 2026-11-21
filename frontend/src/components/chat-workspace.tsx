@@ -11,6 +11,8 @@ import { ChatComposerAttachButton, ChatComposerAttachments, ChatComposerFooter, 
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { ChatSidebar as ChatcnSidebar, ChatSidebarAccount, type ChatThread } from "@/components/ui/chat-sidebar";
 import { ArrowRight, LogOut, PanelLeft, X } from "lucide-react";
+import { BriefcaseBusiness } from "lucide-react";
+import JobsView from "./jobs-view";
 import styles from "./chat-workspace.module.css";
 
 type Conversation = { id: string; title: string; created_at: string };
@@ -26,9 +28,10 @@ function isMobileScreen() {
   return window.matchMedia("(max-width: 767px)").matches;
 }
 
-function ChatSidebar({ items, selected, onCreate, onSelect, onRemove, loading, error, onRetry, user, onLogout }: {
+function ChatSidebar({ items, selected, section, onCreate, onSelect, onRemove, loading, error, onRetry, user, onLogout }: {
   items: Conversation[];
   selected: string | null;
+  section: "chat" | "jobs";
   onCreate: () => Promise<void>;
   onSelect: (id: string) => void;
   onRemove: (id: string) => Promise<void>;
@@ -83,6 +86,8 @@ function ChatSidebar({ items, selected, onCreate, onSelect, onRemove, loading, e
           onRetry={onRetry}
           resizable={!mobile}
           brand={<Link href="/" className={styles.brand} title="TAL home"><span className={styles.brandTile}>T</span><span>TAL</span></Link>}
+          header={<Link href="/jobs" aria-current={section === "jobs" ? "page" : undefined} className={styles.jobsNav}><BriefcaseBusiness aria-hidden="true" size={17} /> Jobs</Link>}
+          railHeader={<Link href="/jobs" aria-current={section === "jobs" ? "page" : undefined} className={styles.jobsRail} aria-label="Jobs" title="Jobs"><BriefcaseBusiness aria-hidden="true" size={19} /></Link>}
           footer={<ChatSidebarAccount name={name} detail={user.email} aria-expanded={accountOpen} aria-haspopup="dialog" onClick={() => setAccountOpen((open) => !open)} />}
           railFooter={<ChatSidebarAccount name={name} detail={user.email} compact aria-expanded={accountOpen} aria-haspopup="dialog" onClick={() => setAccountOpen((open) => !open)} />}
           className={styles.chatcnSidebar}
@@ -303,7 +308,7 @@ function StartConversationView({ onStart }: { onStart: (text: string, file: File
   );
 }
 
-export default function ChatWorkspace({ host }: { host: string }) {
+export default function ChatWorkspace({ host, section = "chat" }: { host: string; section?: "chat" | "jobs" }) {
   const [user, setUser] = useState<CurrentUser | null>(null);
   const [authState, setAuthState] = useState<"checking" | "signed-out" | "unavailable" | "signed-in">("checking");
   const [authAttempt, setAuthAttempt] = useState(0);
@@ -363,6 +368,7 @@ export default function ChatWorkspace({ host }: { host: string }) {
       if (text || file) sessionStorage.setItem(`tal:pending:${item.id}`, text || "What should I know about my attached résumé?");
       setItems((current) => [item, ...current]);
       setSelected(item.id);
+      if (section === "jobs") window.location.assign(`/chat?conversation=${item.id}`);
       setError("");
       return true;
     } catch (failure) {
@@ -399,9 +405,9 @@ export default function ChatWorkspace({ host }: { host: string }) {
       <main className={styles.authGate}>
         <Link href="/" className={styles.authBrand}><span className={styles.brandTile}>T</span>TAL</Link>
         <div className={styles.authDialog} role="dialog" aria-label="Sign in to TAL">
-          <p className={styles.eyebrow}>TAL / Chat</p>
+          <p className={styles.eyebrow}>TAL / {section === "jobs" ? "Jobs" : "Chat"}</p>
           <h1>{authState === "checking" ? "Checking your account…" : authState === "unavailable" ? "We couldn’t reach TAL." : "Please sign in."}</h1>
-          <p>{authState === "checking" ? "Your chats will appear in a moment." : authState === "unavailable" ? "Check your connection and try again." : "Sign in to see your conversations and start a new chat."}</p>
+          <p>{authState === "checking" ? "Your workspace will appear in a moment." : authState === "unavailable" ? "Check your connection and try again." : section === "jobs" ? "Sign in to watch company boards and see open jobs." : "Sign in to see your conversations and start a new chat."}</p>
           {authState === "signed-out" && <Link href="/login" className={styles.signInButton}>Sign in <ArrowRight aria-hidden="true" size={18} /></Link>}
           {authState === "unavailable" && <button type="button" className={styles.signInButton} onClick={() => { setAuthState("checking"); setAuthAttempt((attempt) => attempt + 1); }}>Retry <ArrowRight aria-hidden="true" size={18} /></button>}
         </div>
@@ -412,13 +418,14 @@ export default function ChatWorkspace({ host }: { host: string }) {
   return (
     <TooltipProvider>
     <div className={styles.workspace}>
-      <ChatSidebar items={items} selected={activeConversation} onCreate={create} onSelect={setSelected} onRemove={remove} loading={loading} error={sidebarError} onRetry={() => { void loadConversations(); }} user={user} onLogout={logout} />
+      <ChatSidebar items={items} selected={activeConversation} section={section} onCreate={create} onSelect={(id) => { if (section === "jobs") window.location.assign(`/chat?conversation=${id}`); else setSelected(id); }} onRemove={remove} loading={loading} error={sidebarError} onRetry={() => { void loadConversations(); }} user={user} onLogout={logout} />
       <main className={styles.main}>
         <div className={styles.topBar}>
-          <span>Workspace / Chat</span>
+          <span>Workspace / {section === "jobs" ? "Jobs" : "Chat"}</span>
+          {section === "jobs" && <Link href="/chat" className={styles.topBarLink}>Chat</Link>}
         </div>
         {error && <p role="alert" className={styles.error}>{error}</p>}
-        {activeConversation ? <ConversationView key={activeConversation} id={activeConversation} host={host} /> : <StartConversationView onStart={start} />}
+        {section === "jobs" ? <JobsView /> : activeConversation ? <ConversationView key={activeConversation} id={activeConversation} host={host} /> : <StartConversationView onStart={start} />}
       </main>
     </div>
     </TooltipProvider>

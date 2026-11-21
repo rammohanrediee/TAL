@@ -11,6 +11,9 @@
   "vars": {
     "FRONTEND_URL": "https://tal-steel.vercel.app"
   },
+  "triggers": {
+    "crons": ["0 2 * * *"]
+  },
   "secrets": {
     "required": [
       "DATABASE_URL",
@@ -41,7 +44,7 @@
         "class_name": "TalContainer"
       },
       {
-        "name": "TAL_CHAT",
+        "name": "TalChatAgent",
         "class_name": "TalChatAgent"
       }
     ]

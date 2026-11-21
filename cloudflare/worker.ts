@@ -22,7 +22,7 @@ type RequiredSetting = (typeof REQUIRED_SETTINGS)[number];
 
 interface Env extends Record<RequiredSetting, string> {
   TAL_CONTAINER: DurableObjectNamespace<TalContainer>;
-  TAL_CHAT: DurableObjectNamespace<TalChatAgent>;
+  TalChatAgent: DurableObjectNamespace<TalChatAgent>;
   AI: Ai;
   GOOGLE_CLIENT_ID?: string;
   GOOGLE_CLIENT_SECRET?: string;
@@ -164,6 +164,17 @@ export class TalContainer extends DurableObject<Env> {
 }
 
 export default {
+  async scheduled(_controller: ScheduledController, env: Env, ctx: ExecutionContext): Promise<void> {
+    ctx.waitUntil(env.TAL_CONTAINER.getByName("tal-api").fetch(
+      new Request("https://tal-api.internal/api/v1/jobs/internal/scan", {
+        method: "POST",
+        headers: { "X-Tal-Scan-Key": env.JWT_SECRET_KEY },
+      }),
+    ).then(async (response) => {
+      if (!response.ok) console.error(`Scheduled job scan failed: ${response.status}`);
+      await response.body?.cancel();
+    }));
+  },
   async fetch(request: Request, env: Env): Promise<Response> {
     const missing = REQUIRED_SETTINGS.filter((name) => !env[name]);
     if (missing.length > 0) {
@@ -173,6 +184,9 @@ export default {
       });
     }
     const url = new URL(request.url);
+    if (url.pathname === "/api/v1/jobs/internal/scan") {
+      return new Response("Not found", { status: 404 });
+    }
     if (url.pathname.startsWith("/agents/")) {
       const origin = request.headers.get("Origin");
       const allowedOrigin = env.FRONTEND_URL && new URL(env.FRONTEND_URL).origin;
@@ -219,13 +233,13 @@ export default {
       const { text, filename, truncated, resume_id } = await response.json() as {
         text: string; filename: string; truncated: boolean; resume_id: string;
       };
-      await env.TAL_CHAT.getByName(attachment[1]).attachResume(filename, text);
+      await env.TalChatAgent.getByName(attachment[1]).attachResume(filename, text);
       return Response.json({ filename, truncated, resume_id }, { status: 201 });
     }
     const deletedChat = request.method === "DELETE"
       && url.pathname.match(/^\/api\/v1\/conversations\/([0-9a-f-]{36})$/i);
     if (deletedChat && response.status === 204) {
-      await env.TAL_CHAT.getByName(deletedChat[1]).purge();
+      await env.TalChatAgent.getByName(deletedChat[1]).purge();
     }
     return response;
   },

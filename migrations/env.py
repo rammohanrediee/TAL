@@ -8,6 +8,7 @@ from tal.db.base import Base
 from tal.features.applications import entities  # noqa: F401
 from tal.features.auth import entities as auth_entities  # noqa: F401
 from tal.features.conversations import entities as conversation_entities  # noqa: F401
+from tal.features.jobs import entities as job_entities  # noqa: F401
 from tal.features.resumes import entities as resume_entities  # noqa: F401
 
 # this is the Alembic Config object, which provides
