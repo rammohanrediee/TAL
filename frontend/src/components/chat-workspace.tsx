@@ -175,9 +175,7 @@ function ConnectedConversationView({ id, host, token }: { id: string; host: stri
     agent: "TalChatAgent",
     name: id,
     host,
-    query: async () => ({ token }),
-    queryDeps: [id],
-    cacheTtl: 0,
+    query: { token },
     onOpen: () => setConnected(true),
     onClose: () => setConnected(false),
   });
