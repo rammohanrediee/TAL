@@ -2,7 +2,7 @@
 
 import { useAgent } from "agents/react";
 import { useAgentChat } from "@cloudflare/ai-chat/react";
-import { useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { Suspense, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import Link from "next/link";
 import { MessageScroller, MessageScrollerButton, MessageScrollerContent, MessageScrollerItem, MessageScrollerProvider, MessageScrollerViewport } from "@/components/ui/message-scroller";
 import { Message, MessageContent } from "@/components/ui/message";
@@ -266,7 +266,11 @@ function ConversationView({ id, host }: { id: string; host: string }) {
     return () => { active = false; };
   }, [id, attempt]);
 
-  if (token) return <ConnectedConversationView id={id} host={host} token={token} />;
+  if (token) return (
+    <Suspense fallback={<div className={styles.startView}><div className={styles.noConversation}><p className={styles.eyebrow}>Your conversation</p><h1>Loading your chat…</h1></div></div>}>
+      <ConnectedConversationView id={id} host={host} token={token} />
+    </Suspense>
+  );
 
   const pending = typeof window === "undefined" ? "" : sessionStorage.getItem(`tal:pending:${id}`) ?? "";
   return (

@@ -8,6 +8,9 @@
   "ai": {
     "binding": "AI"
   },
+  "vars": {
+    "FRONTEND_URL": "https://tal-steel.vercel.app"
+  },
   "secrets": {
     "required": [
       "DATABASE_URL",

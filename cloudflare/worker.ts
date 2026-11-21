@@ -174,14 +174,26 @@ export default {
     }
     const url = new URL(request.url);
     if (url.pathname.startsWith("/agents/")) {
+      const origin = request.headers.get("Origin");
+      const allowedOrigin = env.FRONTEND_URL && new URL(env.FRONTEND_URL).origin;
+      if (origin && origin !== allowedOrigin) {
+        return new Response("Forbidden", { status: 403 });
+      }
+      if (request.method === "OPTIONS") {
+        return new Response(null, {
+          status: 204,
+          headers: {
+            "Access-Control-Allow-Origin": allowedOrigin || "",
+            "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+            "Access-Control-Allow-Headers": "Content-Type",
+            "Vary": "Origin",
+          },
+        });
+      }
       const check = async (
         candidate: Request,
         route: { name: string },
       ): Promise<Request | Response> => {
-        const origin = candidate.headers.get("Origin");
-        if (origin && (!env.FRONTEND_URL || origin !== new URL(env.FRONTEND_URL).origin)) {
-          return new Response("Forbidden", { status: 403 });
-        }
         const token = new URL(candidate.url).searchParams.get("token");
         const claims = token && await verifyChatToken(token, env.JWT_SECRET_KEY);
         if (!claims || claims.cid !== route.name) {
@@ -189,10 +201,15 @@ export default {
         }
         return candidate;
       };
-      return (await routeAgentRequest(request, env, {
+      const response = (await routeAgentRequest(request, env, {
         onBeforeConnect: check,
         onBeforeRequest: check,
       })) ?? new Response("Not found", { status: 404 });
+      if (!origin || !allowedOrigin || response.status === 101) return response;
+      const headers = new Headers(response.headers);
+      headers.set("Access-Control-Allow-Origin", allowedOrigin);
+      headers.append("Vary", "Origin");
+      return new Response(response.body, { status: response.status, statusText: response.statusText, headers });
     }
 
     const response = await env.TAL_CONTAINER.getByName("tal-api").fetch(request);
