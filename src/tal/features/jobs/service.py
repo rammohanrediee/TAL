@@ -3,13 +3,54 @@
 from datetime import UTC, datetime, timedelta
 from uuid import UUID
 
-from sqlalchemy import or_, select
+from sqlalchemy import and_, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from tal.features.jobs.entities import JobBoard, JobPosting, JobScan, JobWatch
 from tal.features.jobs.providers import BoardSource, fetch_jobs, parse_board_url
 
 SCAN_COOLDOWN = timedelta(minutes=5)
+CATALOG_BOARDS = (
+    ("https://job-boards.greenhouse.io/twilio", "Twilio"),
+    ("https://job-boards.greenhouse.io/freshprints", "Fresh Prints"),
+    ("https://job-boards.greenhouse.io/kalshi", "Kalshi"),
+    ("https://job-boards.greenhouse.io/alphasenseindia", "AlphaSense India"),
+    ("https://job-boards.greenhouse.io/udacity", "Udacity"),
+    ("https://jobs.lever.co/Sprinto", "Sprinto"),
+    ("https://jobs.lever.co/neuron7", "Neuron7"),
+    ("https://jobs.ashbyhq.com/secfix", "Secfix"),
+    ("https://jobs.ashbyhq.com/firstwork", "FirstWork"),
+)
+
+
+async def ensure_catalog(session: AsyncSession) -> None:
+    for url, company_name in CATALOG_BOARDS:
+        source = parse_board_url(url)
+        board = await session.scalar(
+            select(JobBoard).where(
+                JobBoard.provider == source.provider, JobBoard.slug == source.slug
+            )
+        )
+        if board is None:
+            board = JobBoard(
+                provider=source.provider,
+                slug=source.slug,
+                board_url=source.board_url,
+                company_name=company_name,
+                is_catalog=True,
+            )
+            session.add(board)
+        else:
+            board.company_name = company_name
+            board.is_catalog = True
+    await session.commit()
+
+
+async def list_catalog(session: AsyncSession) -> list[JobBoard]:
+    result = await session.execute(
+        select(JobBoard).where(JobBoard.is_catalog.is_(True)).order_by(JobBoard.company_name)
+    )
+    return list(result.scalars().all())
 
 
 async def watch_board(session: AsyncSession, user_id: UUID, board_url: str) -> JobBoard:
@@ -126,11 +167,13 @@ async def scan_watches(session: AsyncSession, user_id: UUID) -> list[JobScan]:
 
 
 async def scan_all_boards(session: AsyncSession) -> list[JobScan]:
+    await ensure_catalog(session)
     boards = list(
         (
             await session.execute(
                 select(JobBoard)
-                .join(JobWatch, JobWatch.board_id == JobBoard.id)
+                .outerjoin(JobWatch, JobWatch.board_id == JobBoard.id)
+                .where(or_(JobBoard.is_catalog.is_(True), JobWatch.id.is_not(None)))
                 .distinct()
                 .order_by(JobBoard.created_at)
             )
@@ -149,12 +192,15 @@ async def list_jobs(
     company: str | None = None,
     since_days: int | None = None,
     live_only: bool = True,
+    offset: int = 0,
 ) -> list[tuple[JobPosting, JobBoard]]:
     statement = (
         select(JobPosting, JobBoard)
         .join(JobBoard, JobPosting.board_id == JobBoard.id)
-        .join(JobWatch, JobWatch.board_id == JobBoard.id)
-        .where(JobWatch.user_id == user_id)
+        .outerjoin(
+            JobWatch, and_(JobWatch.board_id == JobBoard.id, JobWatch.user_id == user_id)
+        )
+        .where(or_(JobBoard.is_catalog.is_(True), JobWatch.id.is_not(None)))
     )
     if live_only:
         statement = statement.where(JobPosting.is_live.is_(True))
@@ -175,5 +221,7 @@ async def list_jobs(
         statement = statement.where(
             JobPosting.first_seen_at >= datetime.now(UTC) - timedelta(days=since_days)
         )
-    result = await session.execute(statement.order_by(JobPosting.last_seen_at.desc()).limit(100))
+    result = await session.execute(
+        statement.order_by(JobPosting.last_seen_at.desc(), JobPosting.id).offset(offset).limit(51)
+    )
     return list(result.all())

@@ -12,6 +12,10 @@
 .success { background: color-mix(in srgb, var(--tal-green) 13%, white); color: var(--tal-ink); }
 .watchPanel, .results { min-width: 0; }
 .watchPanel { padding: 20px; border: 1px solid var(--tal-border); border-radius: 13px; background: var(--tal-surface); }
+.sourceIntro { margin: -8px 0 12px; color: var(--tal-secondary); font-size: 12px; line-height: 1.5; }
+.sourceList { display: flex; flex-wrap: wrap; gap: 7px; padding-bottom: 20px; margin-bottom: 20px; border-bottom: 1px solid var(--tal-border); }
+.sourceList a { display: inline-flex; align-items: center; gap: 3px; padding: 6px 8px; border: 1px solid var(--tal-border); border-radius: 7px; color: var(--tal-secondary); font-size: 11px; font-weight: 700; }
+.sourceList a:hover { color: var(--tal-ink); border-color: var(--tal-border-strong); }
 .sectionTitle { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 20px; }
 .sectionTitle h2 { font-size: 19px; font-weight: 850; letter-spacing: -.025em; }
 .sectionTitle span { display: grid; min-width: 29px; height: 29px; place-items: center; border-radius: 50%; background: var(--tal-yellow); font-size: 12px; font-weight: 850; }
@@ -43,6 +47,9 @@
 .verified { margin-top: 12px; color: var(--tal-muted); font-size: 11px; }
 .openLink { display: inline-flex; flex: none; align-items: center; gap: 7px; min-height: 39px; padding: 0 13px; border: 1px solid var(--tal-border-strong); border-radius: 8px; font-size: 12px; font-weight: 800; }
 .openLink:hover { border-color: var(--tal-ink); background: var(--tal-canvas); }
+.moreButton { min-height: 44px; padding: 0 18px; border: 1px solid var(--tal-border-strong); border-radius: 8px; background: var(--tal-surface); font-size: 12px; font-weight: 800; }
+.moreButton:hover:not(:disabled) { border-color: var(--tal-ink); }
+.moreButton:disabled { opacity: .5; }
 @media(max-width: 1100px) { .filters { grid-template-columns: repeat(3, minmax(0, 1fr)); } .filters label:first-child { grid-column: span 2; } }
-@media(max-width: 900px) { .body { grid-template-columns: 1fr; } .watchPanel { max-width: none; } }
+@media(max-width: 900px) { .body { grid-template-columns: 1fr; } .watchPanel { max-width: none; order: 2; } .results { order: 1; } }
 @media(max-width: 600px) { .header { flex-direction: column; align-items: stretch; } .filters { grid-template-columns: 1fr; } .filters label:first-child { grid-column: auto; } .jobCard { flex-direction: column; align-items: stretch; } .openLink { width: fit-content; } }

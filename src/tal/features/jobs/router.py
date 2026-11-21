@@ -41,6 +41,14 @@ async def boards(
     return [board_read(board) for board in await service.list_watches(session, user.id)]
 
 
+@router.get("/catalog", response_model=list[BoardRead])
+async def catalog(
+    user: Annotated[User, Depends(get_current_user)],
+    session: Annotated[AsyncSession, Depends(get_db_session)],
+) -> list[BoardRead]:
+    return [board_read(board) for board in await service.list_catalog(session)]
+
+
 @router.post("/boards", response_model=BoardRead, status_code=status.HTTP_201_CREATED)
 async def watch(
     payload: WatchCreate,
@@ -92,6 +100,7 @@ async def jobs(
     work_mode: Annotated[str | None, Query(max_length=50)] = None,
     company: Annotated[str | None, Query(max_length=100)] = None,
     since_days: Annotated[int | None, Query(ge=1, le=90)] = None,
+    offset: Annotated[int, Query(ge=0)] = 0,
     live_only: bool = True,
 ) -> list[JobRead]:
     rows = await service.list_jobs(
@@ -103,6 +112,7 @@ async def jobs(
         company=company,
         since_days=since_days,
         live_only=live_only,
+        offset=offset,
     )
     return [
         JobRead(

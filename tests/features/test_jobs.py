@@ -220,3 +220,66 @@ async def test_failed_feed_does_not_close_existing_jobs(monkeypatch: pytest.Monk
         assert result.status == "failed"
         assert len(await service.list_jobs(session, user.id)) == 1
     await engine.dispose()
+
+
+@pytest.mark.asyncio
+async def test_public_catalog_is_visible_without_a_watch_and_pages(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    engine = create_async_engine("sqlite+aiosqlite:///:memory:")
+    sessions = async_sessionmaker(engine, expire_on_commit=False)
+    async with engine.begin() as connection:
+        await connection.run_sync(Base.metadata.create_all)
+    async with sessions() as session:
+        user = User(email="public-jobs@example.com")
+        session.add(user)
+        await session.commit()
+        await session.refresh(user)
+
+    async def db() -> AsyncIterator[AsyncSession]:
+        async with sessions() as session:
+            yield session
+
+    async def current_user() -> User:
+        return user
+
+    async def feed(_: BoardSource) -> FetchedFeed:
+        return FetchedFeed(
+            [
+                FoundJob(
+                    str(index),
+                    f"Engineer {index}",
+                    "Remote - India",
+                    "Remote",
+                    "Full-time",
+                    None,
+                    f"https://job-boards.greenhouse.io/testco/jobs/{index}",
+                    f"https://job-boards.greenhouse.io/testco/jobs/{index}",
+                )
+                for index in range(55)
+            ],
+            b"snapshot",
+        )
+
+    monkeypatch.setattr(
+        service, "CATALOG_BOARDS", (("https://job-boards.greenhouse.io/testco", "Test Co"),)
+    )
+    monkeypatch.setattr(service, "fetch_jobs", feed)
+    app.dependency_overrides[get_db_session] = db
+    app.dependency_overrides[get_current_user] = current_user
+    try:
+        async with sessions() as session:
+            scans = await service.scan_all_boards(session)
+            assert len(scans) == 1 and scans[0].found_count == 55
+            assert len(await service.list_jobs(session, user.id, offset=50)) == 5
+            await service.ensure_catalog(session)
+            assert len(await service.list_catalog(session)) == 1
+        with TestClient(app) as client:
+            assert client.get("/api/v1/jobs/boards").json() == []
+            assert client.get("/api/v1/jobs/catalog").json()[0]["company_name"] == "Test Co"
+            assert len(client.get("/api/v1/jobs").json()) == 51
+            assert len(client.get("/api/v1/jobs?offset=50").json()) == 5
+            assert len(client.get("/api/v1/jobs?location=India").json()) == 51
+    finally:
+        app.dependency_overrides.clear()
+        await engine.dispose()

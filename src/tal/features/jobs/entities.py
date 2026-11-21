@@ -26,6 +26,7 @@ class JobBoard(Base):
     slug: Mapped[str] = mapped_column(String(160), nullable=False)
     company_name: Mapped[str] = mapped_column(String(200), nullable=False)
     board_url: Mapped[str] = mapped_column(String(2048), nullable=False)
+    is_catalog: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     last_scanned_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     last_error: Mapped[str | None] = mapped_column(String(300))
     created_at: Mapped[datetime] = mapped_column(
