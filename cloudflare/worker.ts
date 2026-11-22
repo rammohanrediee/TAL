@@ -6,7 +6,8 @@ import { convertToModelMessages, isStepCount, pruneMessages, streamText, tool } 
 import { z } from "zod";
 
 const PORT = 8000;
-const INACTIVITY_TIMEOUT_MS = 2 * 60 * 1000;
+const INACTIVITY_TIMEOUT_MS = 15 * 60 * 1000;
+const CHAT_MODEL = "@cf/zai-org/glm-4.7-flash";
 
 const REQUIRED_SETTINGS = [
   "DATABASE_URL",
@@ -188,7 +189,7 @@ export class TalChatAgent extends AIChatAgent<Env> {
 
     try {
       const result = streamText({
-        model: ai("@cf/meta/llama-3.3-70b-instruct-fp8-fast"),
+        model: ai(CHAT_MODEL),
         system,
         tools: { search_jobs: searchJobs, get_profile_summary: profileSummary },
         stopWhen: isStepCount(5),
@@ -202,7 +203,7 @@ export class TalChatAgent extends AIChatAgent<Env> {
     } catch (primaryError) {
       console.error("TalChatAgent primary model failed", primaryError);
       const fallback = streamText({
-        model: ai("@cf/zai-org/glm-4.7-flash"),
+        model: ai("@cf/meta/llama-3.3-70b-instruct-fp8-fast"),
         system,
         messages: pruneMessages({
           messages: await convertToModelMessages(this.messages),
