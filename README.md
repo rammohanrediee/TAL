@@ -190,6 +190,32 @@ npm run dev
 
 The web interface runs at `http://localhost:3000` by default.
 
+## Cloudflare Worker deployment
+
+Production deploys use the **Deploy Cloudflare Worker** GitHub Actions workflow so the
+container image builds on GitHub-hosted runners (Docker) instead of your local machine.
+
+### One-time GitHub configuration
+
+1. Create a Cloudflare API token with at least:
+   - **Account** → **Workers Scripts** → **Edit**
+   - **Account** → **Workers Containers** → **Edit**  
+   ([Create an API token](https://developers.cloudflare.com/fundamentals/api/get-started/create-token/))
+2. In the GitHub repository, open **Settings → Secrets and variables → Actions** and add:
+   - `CLOUDFLARE_API_TOKEN` — the token from step 1
+   - `CLOUDFLARE_ACCOUNT_ID` — your Cloudflare account ID
+
+### Deploy
+
+- **Automatic:** Pushes to `main` run the workflow (after secrets are set).
+- **Manual:** **Actions → Deploy Cloudflare Worker → Run workflow**.
+
+`wrangler deploy` updates the Worker script, bindings, and container image. It does
+**not** remove Worker secrets already configured in Cloudflare (`DATABASE_URL`,
+`JWT_SECRET_KEY`, R2 credentials, and the rest listed in `wrangler.jsonc`). Set or
+rotate those with `wrangler secret put <NAME>` or the Cloudflare dashboard, not in the
+workflow.
+
 ## Vercel frontend deployment
 
 Import the repository into Vercel with **Root Directory set to `frontend`**.
