@@ -5,17 +5,16 @@ Revises: d84b276b97e2
 Create Date: 2026-08-11 15:20:24.776601
 
 """
-from typing import Sequence, Union
+from collections.abc import Sequence
 
-from alembic import op
 import sqlalchemy as sa
-
+from alembic import op
 
 # revision identifiers, used by Alembic.
 revision: str = '7f98304f23b5'
-down_revision: Union[str, Sequence[str], None] = 'd84b276b97e2'
-branch_labels: Union[str, Sequence[str], None] = None
-depends_on: Union[str, Sequence[str], None] = None
+down_revision: str | Sequence[str] | None = 'd84b276b97e2'
+branch_labels: str | Sequence[str] | None = None
+depends_on: str | Sequence[str] | None = None
 
 
 def upgrade() -> None:
@@ -32,7 +31,9 @@ def upgrade() -> None:
     sa.PrimaryKeyConstraint('id'),
     sa.UniqueConstraint('resume_id', 'ordinal', name='uq_resume_text_blocks_resume_ordinal')
     )
-    op.create_index(op.f('ix_resume_text_blocks_resume_id'), 'resume_text_blocks', ['resume_id'], unique=False)
+    op.create_index(
+        op.f('ix_resume_text_blocks_resume_id'), 'resume_text_blocks', ['resume_id'], unique=False
+    )
     # ### end Alembic commands ###
 
 

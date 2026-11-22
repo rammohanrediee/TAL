@@ -239,3 +239,27 @@ def test_list_applications_hides_foreign_applications(
 
     assert response.status_code == 200
     assert response.json() == []
+
+
+def test_delete_application_only_for_owner(client: TestClient, other_user: User) -> None:
+    created = client.post(
+        "/api/v1/applications/",
+        json={"company_name": "OpenAI", "role_title": "Backend Engineer"},
+    )
+    application_id = created.json()["id"]
+    owner_override = app.dependency_overrides[get_current_user]
+
+    async def use_other_user() -> User:
+        return other_user
+
+    app.dependency_overrides[get_current_user] = use_other_user
+    try:
+        foreign_delete = client.delete(f"/api/v1/applications/{application_id}")
+    finally:
+        app.dependency_overrides[get_current_user] = owner_override
+
+    assert foreign_delete.status_code == 404
+    assert client.get(f"/api/v1/applications/{application_id}").status_code == 200
+    assert client.delete(f"/api/v1/applications/{application_id}").status_code == 204
+    assert client.get(f"/api/v1/applications/{application_id}").status_code == 404
+    assert client.delete(f"/api/v1/applications/{application_id}").status_code == 404

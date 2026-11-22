@@ -194,9 +194,10 @@ The web interface runs at `http://localhost:3000` by default.
 
 Import the repository into Vercel with **Root Directory set to `frontend`**.
 Set `TAL_API_URL` to the Cloudflare backend's HTTPS origin, without a trailing
-slash, in the Vercel project environment. The frontend rewrites `/backend/*`
-requests to that origin. The FastAPI backend stays on Cloudflare and does not
-need a Vercel service or binding.
+slash, in the Vercel project environment. Set `TAL_CHAT_URL` to the same origin
+so `/agents/*` WebSocket chat routes through Next.js rewrites. The frontend
+rewrites `/backend/*` and `/agents/*` to that origin. The FastAPI backend stays on
+Cloudflare and does not need a Vercel service or binding.
 
 Google sign-in also needs the deployed frontend URL in Cloudflare's
 `FRONTEND_URL` and the matching `/backend/api/v1/auth/google/callback` URL in

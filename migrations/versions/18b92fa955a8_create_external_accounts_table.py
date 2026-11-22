@@ -5,17 +5,16 @@ Revises: b8f351e5e4a5
 Create Date: 2026-07-27 21:44:15.994770
 
 """
-from typing import Sequence, Union
+from collections.abc import Sequence
 
-from alembic import op
 import sqlalchemy as sa
-
+from alembic import op
 
 # revision identifiers, used by Alembic.
 revision: str = '18b92fa955a8'
-down_revision: Union[str, Sequence[str], None] = 'b8f351e5e4a5'
-branch_labels: Union[str, Sequence[str], None] = None
-depends_on: Union[str, Sequence[str], None] = None
+down_revision: str | Sequence[str] | None = 'b8f351e5e4a5'
+branch_labels: str | Sequence[str] | None = None
+depends_on: str | Sequence[str] | None = None
 
 
 def upgrade() -> None:
@@ -31,9 +30,13 @@ def upgrade() -> None:
     sa.Column('updated_at', sa.DateTime(timezone=True), nullable=False),
     sa.ForeignKeyConstraint(['user_id'], ['users.id'], ondelete='CASCADE'),
     sa.PrimaryKeyConstraint('id'),
-    sa.UniqueConstraint('provider', 'provider_subject', name='uq_external_accounts_provider_subject')
+    sa.UniqueConstraint(
+        'provider', 'provider_subject', name='uq_external_accounts_provider_subject'
     )
-    op.create_index(op.f('ix_externalAccounts_user_id'), 'externalAccounts', ['user_id'], unique=False)
+    )
+    op.create_index(
+        op.f('ix_externalAccounts_user_id'), 'externalAccounts', ['user_id'], unique=False
+    )
     # ### end Alembic commands ###
 
 

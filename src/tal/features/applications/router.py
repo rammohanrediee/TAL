@@ -1,7 +1,7 @@
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Response, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from tal.db.session import get_db_session
@@ -11,6 +11,7 @@ from tal.features.applications.schemas import (
     ApplicationStatusUpdate,
 )
 from tal.features.applications.service import create_application as create_application_service
+from tal.features.applications.service import delete_application as delete_application_service
 from tal.features.applications.service import get_application, update_application_status
 from tal.features.applications.service import list_applications as list_application_service
 from tal.features.auth.dependencies import get_current_user
@@ -53,3 +54,13 @@ async def patch_application_status(
     current_user: Annotated[User, Depends(get_current_user)]
 ) -> ApplicationRead:
     return await update_application_status(id, payload, session,current_user.id)
+
+
+@router.delete("/{application_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_application(
+    application_id: UUID,
+    session: Annotated[AsyncSession, Depends(get_db_session)],
+    current_user: Annotated[User, Depends(get_current_user)],
+) -> Response:
+    await delete_application_service(application_id, session, current_user.id)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)

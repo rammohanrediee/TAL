@@ -1,3 +1,4 @@
+import os
 from collections.abc import AsyncIterator
 
 import pytest
@@ -17,6 +18,15 @@ from tal.features.jobs.providers import (
     parse_board_url,
 )
 from tal.main import app
+
+
+def test_internal_scan_rejects_missing_wrong_or_jwt_secret() -> None:
+    jwt_secret = os.environ.get("JWT_SECRET_KEY", "test-jwt-secret")
+    with TestClient(app) as client:
+        path = "/api/v1/jobs/internal/scan"
+        assert client.post(path).status_code == 404
+        assert client.post(path, headers={"X-Tal-Scan-Key": "wrong"}).status_code == 404
+        assert client.post(path, headers={"X-Tal-Scan-Key": jwt_secret}).status_code == 404
 
 
 @pytest.mark.parametrize(

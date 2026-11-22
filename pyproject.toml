@@ -27,6 +27,7 @@ dependencies = [
   "pypdf>=6.21.4,<7",
   "python-docx>=1.2,<2",
   "openai>=2.45,<3",
+  "redis>=5.0,<6",
 
 ]
 
@@ -47,6 +48,7 @@ packages = ["src/tal"]
 [tool.pytest.ini_options]
 addopts = "-q --strict-markers --cov=tal --cov-report=term-missing"
 asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
 testpaths = ["tests"]
 
 [tool.ruff]
@@ -60,7 +62,7 @@ select = ["E", "F", "I", "UP", "B", "SIM", "ASYNC"]
 python_version = "3.12"
 strict = true
 plugins = ["pydantic.mypy"]
-packages = ["tal"]
+files = ["src/tal"]
 
 [[tool.mypy.overrides]]
 module = ["celery", "boto3", "botocore.*"]

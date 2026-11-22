@@ -5,17 +5,16 @@ Revises: 24da6292706d
 Create Date: 2026-08-05 23:34:42.933385
 
 """
-from typing import Sequence, Union
+from collections.abc import Sequence
 
-from alembic import op
 import sqlalchemy as sa
-
+from alembic import op
 
 # revision identifiers, used by Alembic.
 revision: str = 'd84b276b97e2'
-down_revision: Union[str, Sequence[str], None] = '24da6292706d'
-branch_labels: Union[str, Sequence[str], None] = None
-depends_on: Union[str, Sequence[str], None] = None
+down_revision: str | Sequence[str] | None = '24da6292706d'
+branch_labels: str | Sequence[str] | None = None
+depends_on: str | Sequence[str] | None = None
 
 
 def upgrade() -> None:
@@ -24,7 +23,11 @@ def upgrade() -> None:
     op.create_table('resumes',
     sa.Column('id', sa.Uuid(), nullable=False),
     sa.Column('user_id', sa.Uuid(), nullable=False),
-    sa.Column('status', sa.Enum('uploaded', 'processing', 'ready', 'failed', name='resume_status'), nullable=False),
+    sa.Column(
+        'status',
+        sa.Enum('uploaded', 'processing', 'ready', 'failed', name='resume_status'),
+        nullable=False,
+    ),
     sa.Column('original_filename', sa.String(length=255), nullable=False),
     sa.Column('content_type', sa.String(length=100), nullable=False),
     sa.Column('size_bytes', sa.BigInteger(), nullable=False),

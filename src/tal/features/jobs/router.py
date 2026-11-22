@@ -11,7 +11,16 @@ from tal.features.auth.dependencies import get_current_user
 from tal.features.auth.entities import User
 from tal.features.jobs import service
 from tal.features.jobs.entities import JobBoard, JobScan
-from tal.features.jobs.schemas import BoardRead, JobRead, ScanRead, WatchCreate
+from tal.features.jobs.chat_search import ChatSearchFilters, chat_search_jobs
+from tal.features.jobs.schemas import (
+    BoardRead,
+    ChatSearchRequest,
+    ChatSearchResponse,
+    JobRead,
+    ScanRead,
+    WatchCreate,
+)
+from tal.features.matching.profile import ProfileSummary, build_profile_summary
 
 router = APIRouter(prefix="/jobs", tags=["jobs"])
 
@@ -85,10 +94,108 @@ async def scheduled_scan(
     x_tal_scan_key: Annotated[str | None, Header()] = None,
 ) -> list[ScanRead]:
     if not x_tal_scan_key or not secrets.compare_digest(
-        x_tal_scan_key, settings.jwt_secret_key.get_secret_value()
+        x_tal_scan_key, settings.job_scan_secret.get_secret_value()
     ):
         raise HTTPException(status_code=404, detail="Not found")
     return [scan_read(item) for item in await service.scan_all_boards(session)]
+
+
+@router.post("/chat-search", response_model=ChatSearchResponse)
+async def chat_search(
+    payload: ChatSearchRequest,
+    user: Annotated[User, Depends(get_current_user)],
+    session: Annotated[AsyncSession, Depends(get_db_session)],
+) -> ChatSearchResponse:
+    result = await chat_search_jobs(
+        session,
+        user.id,
+        conversation_id=payload.conversation_id,
+        filters=ChatSearchFilters(
+            query=payload.query,
+            location=payload.location,
+            work_mode=payload.work_mode,
+            company=payload.company,
+            since_days=payload.since_days,
+            use_resume_skills=payload.use_resume_skills,
+            min_fit_score=payload.min_fit_score,
+        ),
+    )
+    await session.commit()
+    return ChatSearchResponse(
+        jobs=list(result.jobs),
+        skills_considered=list(result.skills_considered),
+        resume_id=result.resume_id,
+        feed_stale=result.feed_stale,
+    )
+
+
+@router.post("/internal/chat-search", response_model=ChatSearchResponse, include_in_schema=False)
+async def internal_chat_search(
+    payload: ChatSearchRequest,
+    session: Annotated[AsyncSession, Depends(get_db_session)],
+    x_tal_chat_tool_key: Annotated[str | None, Header()] = None,
+    x_tal_user_id: Annotated[str | None, Header()] = None,
+) -> ChatSearchResponse:
+    if not x_tal_chat_tool_key or not secrets.compare_digest(
+        x_tal_chat_tool_key, settings.chat_tool_secret.get_secret_value()
+    ):
+        raise HTTPException(status_code=404, detail="Not found")
+    if not x_tal_user_id:
+        raise HTTPException(status_code=400, detail="Missing user")
+    try:
+        user_id = UUID(x_tal_user_id)
+    except ValueError as error:
+        raise HTTPException(status_code=400, detail="Invalid user") from error
+    result = await chat_search_jobs(
+        session,
+        user_id,
+        conversation_id=payload.conversation_id,
+        filters=ChatSearchFilters(
+            query=payload.query,
+            location=payload.location,
+            work_mode=payload.work_mode,
+            company=payload.company,
+            since_days=payload.since_days,
+            use_resume_skills=payload.use_resume_skills,
+            min_fit_score=payload.min_fit_score,
+        ),
+    )
+    await session.commit()
+    return ChatSearchResponse(
+        jobs=list(result.jobs),
+        skills_considered=list(result.skills_considered),
+        resume_id=result.resume_id,
+        feed_stale=result.feed_stale,
+    )
+
+
+@router.get("/profile-summary", response_model=ProfileSummary)
+async def job_profile_summary(
+    user: Annotated[User, Depends(get_current_user)],
+    session: Annotated[AsyncSession, Depends(get_db_session)],
+    conversation_id: UUID | None = None,
+) -> ProfileSummary:
+    return await build_profile_summary(session, user.id, conversation_id=conversation_id)
+
+
+@router.get("/internal/profile-summary", response_model=ProfileSummary, include_in_schema=False)
+async def internal_profile_summary(
+    session: Annotated[AsyncSession, Depends(get_db_session)],
+    x_tal_chat_tool_key: Annotated[str | None, Header()] = None,
+    x_tal_user_id: Annotated[str | None, Header()] = None,
+    conversation_id: UUID | None = None,
+) -> ProfileSummary:
+    if not x_tal_chat_tool_key or not secrets.compare_digest(
+        x_tal_chat_tool_key, settings.chat_tool_secret.get_secret_value()
+    ):
+        raise HTTPException(status_code=404, detail="Not found")
+    if not x_tal_user_id:
+        raise HTTPException(status_code=400, detail="Missing user")
+    try:
+        user_id = UUID(x_tal_user_id)
+    except ValueError as error:
+        raise HTTPException(status_code=400, detail="Invalid user") from error
+    return await build_profile_summary(session, user_id, conversation_id=conversation_id)
 
 
 @router.get("", response_model=list[JobRead])

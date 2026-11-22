@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { ArrowUpRight, RefreshCw, Search, X } from "lucide-react";
+import { apiFetch } from "@/lib/api";
 import styles from "./jobs-view.module.css";
 
 type Board = { id: string; provider: string; company_name: string; board_url: string; last_scanned_at: string | null; last_error: string | null };
@@ -10,7 +11,7 @@ type Scan = { board_id: string; status: string; found_count: number; error: stri
 const PAGE_SIZE = 50;
 
 async function jobsApi(path: string, init?: RequestInit) {
-  const response = await fetch(`/backend/api/v1/jobs${path}`, { credentials: "include", ...init });
+  const response = await apiFetch(`/backend/api/v1/jobs${path}`, init);
   if (!response.ok) {
     const data = await response.json().catch(() => ({})) as { detail?: string };
     throw new Error(data.detail || `Request failed (${response.status})`);

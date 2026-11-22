@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@ai-sdk/react": "^4.0.181",
+    "@astryxdesign/core": "^0.7.17",
     "@base-ui/react": "^1.9.0",
     "@cloudflare/ai-chat": "^0.12.3",
     "@shadcn/react": "^0.3.1",

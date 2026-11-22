@@ -7,6 +7,7 @@ from starlette.middleware.sessions import SessionMiddleware
 
 from tal.api.router import api_router
 from tal.core.config import settings
+from tal.core.csrf_middleware import CsrfMiddleware
 from tal.core.errors import DomainError
 
 
@@ -18,12 +19,17 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
 
 async def domain_error_handler(_: Request, error: Exception) -> JSONResponse:
     assert isinstance(error, DomainError)
+    headers: dict[str, str] = {}
+    retry_after = getattr(error, "retry_after_seconds", None)
+    if isinstance(retry_after, int):
+        headers["Retry-After"] = str(retry_after)
     return JSONResponse(
         status_code=error.status_code,
         content={
             "code": error.code,
             "message": error.message,
         },
+        headers=headers,
     )
 
 
@@ -35,12 +41,13 @@ def create_app() -> FastAPI:
     )
     application.include_router(api_router, prefix=settings.api_v1_prefix)
     application.add_exception_handler(DomainError, domain_error_handler)
+    application.add_middleware(CsrfMiddleware)
     application.add_middleware(
-    SessionMiddleware,
-    secret_key=settings.oauth_state_secret.get_secret_value(),
-    same_site="lax",
-    https_only=settings.app_env == "production",
-)
+        SessionMiddleware,
+        secret_key=settings.oauth_state_secret.get_secret_value(),
+        same_site="lax",
+        https_only=settings.app_env == "production",
+    )
     return application
 
 

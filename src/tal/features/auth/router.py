@@ -8,6 +8,13 @@ from starlette.responses import RedirectResponse
 
 from tal.core.config import settings
 from tal.db.session import get_db_session
+from tal.features.auth.csrf import (
+    ACCESS_COOKIE,
+    CSRF_COOKIE,
+    clear_session_cookies,
+    set_csrf_cookie,
+    set_session_cookies,
+)
 from tal.features.auth.dependencies import get_current_user
 from tal.features.auth.entities import User
 from tal.features.auth.errors import InvalidCredentialsError
@@ -15,6 +22,7 @@ from tal.features.auth.oauth import oauth
 from tal.features.auth.schemas import TokenResponse, UserRead, UserRegister
 from tal.features.auth.security import create_access_token
 from tal.features.auth.service import authenticate_user, get_or_create_external_user
+from tal.features.auth.rate_limit import rate_limit_login, rate_limit_oauth, rate_limit_register
 from tal.features.auth.service import register as register_service
 
 router = APIRouter(prefix="/auth")
@@ -22,7 +30,9 @@ router = APIRouter(prefix="/auth")
 
 @router.post("/register", response_model=UserRead, status_code=status.HTTP_201_CREATED)
 async def register(
-    payload: UserRegister, session: Annotated[AsyncSession, Depends(get_db_session)]
+    payload: UserRegister,
+    session: Annotated[AsyncSession, Depends(get_db_session)],
+    _: Annotated[None, Depends(rate_limit_register)],
 ) -> UserRead:
     return await register_service(payload, session)
 
@@ -32,6 +42,7 @@ async def issue_access_token(
     form_data: Annotated[OAuth2PasswordRequestForm, Depends()],
     session: Annotated[AsyncSession, Depends(get_db_session)],
     response: Response,
+    _: Annotated[None, Depends(rate_limit_login)],
 ) -> TokenResponse:
     user = await authenticate_user(
         email=form_data.username,
@@ -39,27 +50,26 @@ async def issue_access_token(
         session=session,
     )
     token = create_access_token(user.id)
-    response.set_cookie(
-        key="tal_access_token",
-        value=token,
-        httponly=True,
-        secure=settings.app_env == "production",
-        samesite="lax",
-        path="/",
-        max_age=settings.access_token_expire_minutes * 60,
-    )
+    set_session_cookies(response, access_token=token)
     return TokenResponse(access_token=token)
 
 
 @router.get("/me", response_model=UserRead)
 async def read_current_user(
+    request: Request,
+    response: Response,
     current_user: Annotated[User, Depends(get_current_user)],
 ) -> UserRead:
+    if request.cookies.get(ACCESS_COOKIE) and not request.cookies.get(CSRF_COOKIE):
+        set_csrf_cookie(response)
     return UserRead.model_validate(current_user)
 
 
 @router.get("/google/login", response_class=RedirectResponse)
-async def google_login(request: Request) -> RedirectResponse:
+async def google_login(
+    request: Request,
+    _: Annotated[None, Depends(rate_limit_oauth)],
+) -> RedirectResponse:
     google = oauth.create_client("google")
     if google is None or settings.google_redirect_uri is None:
         raise HTTPException(status_code=503, detail="Google sign-in is not configured")
@@ -76,6 +86,7 @@ async def google_login(request: Request) -> RedirectResponse:
 async def google_callback(
     request: Request,
     session: Annotated[AsyncSession, Depends(get_db_session)],
+    _: Annotated[None, Depends(rate_limit_oauth)],
 ) -> RedirectResponse:
     google = oauth.create_client("google")
     if google is None:
@@ -103,24 +114,10 @@ async def google_callback(
         url=f"{settings.frontend_url.rstrip('/')}/chat",
         status_code=status.HTTP_303_SEE_OTHER,
     )
-    redirect_response.set_cookie(
-        key="tal_access_token",
-        value=tal_access_token,
-        httponly=True,
-        secure=settings.app_env == "production",
-        samesite="lax",
-        path="/",
-        max_age=settings.access_token_expire_minutes * 60,
-    )
+    set_session_cookies(redirect_response, access_token=tal_access_token)
     return redirect_response
 
 
 @router.post("/logout", status_code=status.HTTP_204_NO_CONTENT)
 async def logout(response: Response) -> None:
-    response.delete_cookie(
-        key="tal_access_token",
-        path="/",
-        secure=settings.app_env == "production",
-        httponly=True,
-        samesite="lax",
-    )
+    clear_session_cookies(response)

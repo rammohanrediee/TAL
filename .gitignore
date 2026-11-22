@@ -16,7 +16,6 @@ build/
 .omx
 
 # Local development metadata
-AGENTS.md
 CLAUDE.md
 .agents/
 .codex/

@@ -1,7 +1,7 @@
 from datetime import UTC, datetime
 from uuid import UUID, uuid4
 
-from sqlalchemy import DateTime, ForeignKey, String, Uuid
+from sqlalchemy import JSON, DateTime, ForeignKey, String, Uuid
 from sqlalchemy.orm import Mapped, mapped_column
 
 from tal.db.base import Base
@@ -22,3 +22,4 @@ class Conversation(Base):
         DateTime(timezone=True), default=lambda: datetime.now(UTC), nullable=False
     )
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    search_context: Mapped[dict[str, object] | None] = mapped_column(JSON, nullable=True)

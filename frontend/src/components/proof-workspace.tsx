@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
+import { apiFetch, getCsrfToken } from "@/lib/api";
 
 type ResumeStatus = "uploaded" | "processing" | "ready" | "failed";
 type EvidenceStatus = "pending" | "confirmed" | "corrected" | "rejected";
@@ -239,7 +240,7 @@ export default function ProofWorkspace() {
     const controller = new AbortController();
     async function loadUser() {
       try {
-        const response = await fetch("/backend/api/v1/auth/me", { credentials: "include", signal: controller.signal });
+        const response = await apiFetch("/backend/api/v1/auth/me", { signal: controller.signal });
         setUser(response.ok ? (await response.json()) as CurrentUser : null);
       } catch (caught) {
         if (!(caught instanceof DOMException && caught.name === "AbortError")) setUser(null);
@@ -263,7 +264,7 @@ export default function ProofWorkspace() {
       }
       attempts += 1;
       try {
-        const response = await fetch(`/backend/api/v1/resumes/${resume?.id}`, { credentials: "include", signal: controller.signal });
+        const response = await apiFetch(`/backend/api/v1/resumes/${resume?.id}`, { signal: controller.signal });
         if (!response.ok) {
           const data = (await response.json().catch(() => ({}))) as ApiError;
           throw new Error(apiMessage(data, "TAL could not check this résumé’s status."));
@@ -297,7 +298,7 @@ export default function ProofWorkspace() {
     async function loadEvidence() {
       setEvidenceState("loading");
       try {
-        const response = await fetch(`/backend/api/v1/resumes/${resume?.id}/evidence`, { credentials: "include", signal: controller.signal });
+        const response = await apiFetch(`/backend/api/v1/resumes/${resume?.id}/evidence`, { signal: controller.signal });
         if (!response.ok) {
           const data = (await response.json().catch(() => ({}))) as ApiError;
           throw new Error(apiMessage(data, "TAL could not load this résumé’s evidence."));
@@ -341,7 +342,7 @@ export default function ProofWorkspace() {
   }
 
   async function logout() {
-    const response = await fetch("/backend/api/v1/auth/logout", { method: "POST", credentials: "include" });
+    const response = await apiFetch("/backend/api/v1/auth/logout", { method: "POST" });
     if (response.ok) { setUser(null); reset(); }
   }
 
@@ -360,6 +361,8 @@ export default function ProofWorkspace() {
       const result = await new Promise<{ status: number; data: ResumeRead | ApiError }>((resolve, reject) => {
         request.open("POST", "/backend/api/v1/resumes/");
         request.withCredentials = true;
+        const csrf = getCsrfToken();
+        if (csrf) request.setRequestHeader("X-CSRF-Token", csrf);
         request.responseType = "json";
         request.upload.addEventListener("progress", (progress) => { if (progress.lengthComputable) setUploadProgress(Math.min(Math.round((progress.loaded / progress.total) * 100), 99)); });
         request.addEventListener("load", () => resolve({ status: request.status, data: (request.response ?? {}) as ResumeRead | ApiError }));
@@ -389,7 +392,11 @@ export default function ProofWorkspace() {
     setSavingId(item.id);
     setEvidenceFeedback(null);
     try {
-      const response = await fetch(`/backend/api/v1/resumes/evidence/${item.id}`, { method: "PATCH", credentials: "include", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ corrected_text: correctedText }) });
+      const response = await apiFetch(`/backend/api/v1/resumes/evidence/${item.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ corrected_text: correctedText }),
+      });
       if (!response.ok) {
         const data = (await response.json().catch(() => ({}))) as ApiError;
         throw new Error(apiMessage(data, "TAL could not save this correction."));
@@ -415,7 +422,7 @@ export default function ProofWorkspace() {
         <nav className="mt-8 space-y-1" aria-label="Main navigation">
           <Link href="/" className="flex min-h-11 items-center gap-3 rounded-[10px] px-3 text-sm font-medium text-white/70 transition-colors hover:bg-white/[.06] hover:text-white"><HomeIcon /> Home</Link>
           <a href={ready ? "#evidence-review" : "#resume-workflow"} className="flex min-h-11 items-center gap-3 rounded-[10px] bg-white/10 px-3 text-sm font-semibold text-tal-yellow"><DocumentIcon /> Proofs</a>
-          <span aria-disabled="true" title="Applications arrive in a later TAL milestone" className="flex min-h-11 cursor-not-allowed items-center gap-3 rounded-[10px] px-3 text-sm font-medium text-white/35"><BriefcaseIcon /> Applications <span className="ml-auto text-[11px]">Later</span></span>
+          <Link href="/applications" className="flex min-h-11 items-center gap-3 rounded-[10px] px-3 text-sm font-medium text-white/70 transition-colors hover:bg-white/[.06] hover:text-white"><BriefcaseIcon /> Applications</Link>
         </nav>
         <div className="mt-auto border-t border-white/10 pt-4">
           {user ? <div className="px-2 py-2"><p className="text-xs text-white/45">Signed in as</p><p className="mt-1 truncate text-sm font-medium" title={user.email}>{user.email}</p><button type="button" onClick={() => void logout()} className="mt-3 min-h-11 text-sm font-semibold text-white/65 hover:text-white">Log out</button></div> : <Link href="/login" className="flex min-h-11 items-center justify-between rounded-[10px] px-3 text-sm font-semibold text-white/75 hover:bg-white/[.06] hover:text-white">Sign in <span aria-hidden="true">→</span></Link>}

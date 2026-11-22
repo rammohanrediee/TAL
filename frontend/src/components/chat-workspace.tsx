@@ -2,21 +2,63 @@
 
 import { useAgent } from "agents/react";
 import { useAgentChat } from "@cloudflare/ai-chat/react";
-import { Suspense, useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { Suspense, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import Link from "next/link";
 import { MessageScroller, MessageScrollerButton, MessageScrollerContent, MessageScrollerItem, MessageScrollerProvider, MessageScrollerViewport } from "@/components/ui/message-scroller";
 import { Message, MessageContent } from "@/components/ui/message";
 import { Bubble, BubbleContent } from "@/components/ui/bubble";
-import { ChatComposerAttachButton, ChatComposerAttachments, ChatComposerFooter, ChatComposerFrame, ChatComposerHeader, ChatComposerInput, ChatComposerSubmit, LocalChatComposerProvider } from "@/components/ui/chat-composer";
+import { TalChatComposer } from "@/components/tal-chat-composer";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { ChatSidebar as ChatcnSidebar, ChatSidebarAccount, type ChatThread } from "@/components/ui/chat-sidebar";
 import { ArrowRight, LogOut, PanelLeft, X } from "lucide-react";
-import { BriefcaseBusiness } from "lucide-react";
+import { BriefcaseBusiness, ClipboardList } from "lucide-react";
 import JobsView from "./jobs-view";
+import ApplicationsView from "./applications-view";
+import JobSearchCards, { extractJobSearchFromMessageParts } from "@/components/job-search-cards";
+import { apiFetch } from "@/lib/api";
 import styles from "./chat-workspace.module.css";
 
 type Conversation = { id: string; title: string; created_at: string };
 type CurrentUser = { id: string; email: string; is_active: boolean };
+
+const JOB_SEARCH_STARTERS = [
+  "Find remote Python backend roles posted in the last 30 days",
+  "Search senior software engineer jobs and rank them by résumé fit",
+  "Show me product manager openings with strong skill match",
+] as const;
+
+function textFromMessagePart(part: unknown): string | null {
+  if (!part || typeof part !== "object") return null;
+  const record = part as Record<string, unknown>;
+  const type = String(record.type ?? "");
+  if (type === "reasoning") return null;
+  if (typeof record.text === "string" && (type === "text" || type.startsWith("text"))) {
+    return record.text;
+  }
+  return null;
+}
+
+function textFromMessage(message: { parts?: unknown[]; content?: unknown }): string {
+  if (Array.isArray(message.parts)) {
+    const chunks = message.parts.map(textFromMessagePart).filter((chunk): chunk is string => Boolean(chunk));
+    if (chunks.length > 0) return chunks.join("");
+  }
+  if (typeof message.content === "string") return message.content;
+  return "";
+}
+
+function subscribeChatHost(callback: () => void) {
+  const onChange = () => callback();
+  window.addEventListener("pageshow", onChange);
+  return () => window.removeEventListener("pageshow", onChange);
+}
+
+function chatAgentHost(fallbackHost: string): string {
+  const explicit = process.env.NEXT_PUBLIC_TAL_CHAT_URL;
+  if (explicit) return new URL(explicit).host;
+  if (typeof window !== "undefined") return window.location.host;
+  return fallbackHost;
+}
 
 function subscribeMobile(callback: () => void) {
   const media = window.matchMedia("(max-width: 767px)");
@@ -31,7 +73,7 @@ function isMobileScreen() {
 function ChatSidebar({ items, selected, section, onCreate, onSelect, onRemove, loading, error, onRetry, user, onLogout }: {
   items: Conversation[];
   selected: string | null;
-  section: "chat" | "jobs";
+  section: "chat" | "jobs" | "applications";
   onCreate: () => Promise<void>;
   onSelect: (id: string) => void;
   onRemove: (id: string) => Promise<void>;
@@ -86,8 +128,8 @@ function ChatSidebar({ items, selected, section, onCreate, onSelect, onRemove, l
           onRetry={onRetry}
           resizable={!mobile}
           brand={<Link href="/" className={styles.brand} title="TAL home"><span className={styles.brandTile}>T</span><span>TAL</span></Link>}
-          header={<Link href="/jobs" aria-current={section === "jobs" ? "page" : undefined} className={styles.jobsNav}><BriefcaseBusiness aria-hidden="true" size={17} /> Jobs</Link>}
-          railHeader={<Link href="/jobs" aria-current={section === "jobs" ? "page" : undefined} className={styles.jobsRail} aria-label="Jobs" title="Jobs"><BriefcaseBusiness aria-hidden="true" size={19} /></Link>}
+          header={<><Link href="/jobs" aria-current={section === "jobs" ? "page" : undefined} className={styles.jobsNav}><BriefcaseBusiness aria-hidden="true" size={17} /> Jobs</Link><Link href="/applications" aria-current={section === "applications" ? "page" : undefined} className={styles.jobsNav}><ClipboardList aria-hidden="true" size={17} /> Applications</Link></>}
+          railHeader={<><Link href="/jobs" aria-current={section === "jobs" ? "page" : undefined} className={styles.jobsRail} aria-label="Jobs" title="Jobs"><BriefcaseBusiness aria-hidden="true" size={19} /></Link><Link href="/applications" aria-current={section === "applications" ? "page" : undefined} className={styles.jobsRail} aria-label="Applications" title="Applications"><ClipboardList aria-hidden="true" size={19} /></Link></>}
           footer={<ChatSidebarAccount name={name} detail={user.email} aria-expanded={accountOpen} aria-haspopup="dialog" onClick={() => setAccountOpen((open) => !open)} />}
           railFooter={<ChatSidebarAccount name={name} detail={user.email} compact aria-expanded={accountOpen} aria-haspopup="dialog" onClick={() => setAccountOpen((open) => !open)} />}
           className={styles.chatcnSidebar}
@@ -112,79 +154,38 @@ function ChatSidebar({ items, selected, section, onCreate, onSelect, onRemove, l
 }
 
 async function conversations(path = "", init?: RequestInit) {
-  const response = await fetch(`/backend/api/v1/conversations${path}`, {
-    credentials: "include",
-    ...init,
-  });
+  const response = await apiFetch(`/backend/api/v1/conversations${path}`, init);
   if (response.status === 401) throw new Error("signed-out");
   if (!response.ok) throw new Error("Chat request failed");
   return response.status === 204 ? null : response.json();
 }
 
-function TalComposer({ id, onSend, disabled = false, attachedName }: {
+function TalComposer(props: {
   id: string;
   onSend: (text: string, file: File | null) => Promise<void>;
   disabled?: boolean;
   attachedName?: string;
 }) {
-  const [error, setError] = useState("");
-
-  return (
-    <div className={styles.composerDock}>
-      {error && <p role="alert" className={styles.error}>{error}</p>}
-      <div className={styles.composerForm}>
-        <LocalChatComposerProvider
-          disabled={disabled}
-          onSubmit={async ({ value, attachments }) => {
-            const file = attachments[0]?.file ?? null;
-            if (attachments.length > 1) {
-              setError("Attach one résumé at a time.");
-              throw new Error("Too many attachments");
-            }
-            if (file && file.size > 5 * 1024 * 1024) {
-              setError("Résumé must be 5 MB or smaller.");
-              throw new Error("Attachment too large");
-            }
-            try {
-              await onSend(value, file);
-              setError("");
-            } catch (caught) {
-              setError(caught instanceof Error ? caught.message : "Could not send your message.");
-              throw caught;
-            }
-          }}
-        >
-          <ChatComposerFrame className={styles.composer}>
-            <ChatComposerHeader className={styles.composerHeader}>
-              <label htmlFor={id} className={styles.composerLabel}>Your message</label>
-            </ChatComposerHeader>
-            <ChatComposerInput id={id} maxLength={4000} rows={3} placeholder="Ask TAL about a role, your résumé, or your next move…" className={styles.composerInput} />
-            <ChatComposerAttachments className={styles.attachmentList} />
-            {attachedName && <p className={styles.attachment}>Résumé attached · {attachedName}</p>}
-            <ChatComposerFooter className={styles.composerActions}>
-              <ChatComposerAttachButton accept=".pdf,.docx" label="Attach PDF or DOCX résumé" className={styles.attachButton} />
-              <span className={styles.composerHint}>Enter to send · Shift+Enter for a new line</span>
-              <ChatComposerSubmit className={styles.sendButton}>Send →</ChatComposerSubmit>
-            </ChatComposerFooter>
-          </ChatComposerFrame>
-        </LocalChatComposerProvider>
-      </div>
-    </div>
-  );
+  return <TalChatComposer {...props} />;
 }
 
-function ConnectedConversationView({ id, host, token }: { id: string; host: string; token: string }) {
+function ConnectedConversationView({ id, fallbackHost, token }: { id: string; fallbackHost: string; token: string }) {
   const [connected, setConnected] = useState(false);
   const [attachment, setAttachment] = useState("");
+  const agentHost = useSyncExternalStore(subscribeChatHost, () => chatAgentHost(fallbackHost), () => fallbackHost);
+  const chatAuthHeaders = useMemo(
+    () => ({ Authorization: `Bearer ${token}` }),
+    [token],
+  );
   const agent = useAgent({
     agent: "TalChatAgent",
     name: id,
-    host,
-    query: { token },
+    host: agentHost,
+    protocols: [token],
     onOpen: () => setConnected(true),
     onClose: () => setConnected(false),
   });
-  const { messages, sendMessage, status } = useAgentChat({ agent });
+  const { messages, sendMessage, status, error: chatError } = useAgentChat({ agent, headers: chatAuthHeaders });
 
   useEffect(() => {
     if (!connected || status !== "ready") return;
@@ -200,8 +201,8 @@ function ConnectedConversationView({ id, host, token }: { id: string; host: stri
     if (file) {
       const body = new FormData();
       body.append("file", file);
-      const response = await fetch(`/backend/api/v1/conversations/${id}/attachment`, {
-        method: "POST", credentials: "include", body,
+      const response = await apiFetch(`/backend/api/v1/conversations/${id}/attachment`, {
+        method: "POST", body,
       });
       if (!response.ok) {
         const data = await response.json().catch(() => ({})) as { message?: string };
@@ -228,31 +229,71 @@ function ConnectedConversationView({ id, host, token }: { id: string; host: stri
             <p className={styles.eyebrow}>A place to start</p>
             <h2>What would you like to work through?</h2>
             <p>Ask about your job search. Attach a résumé when you want an answer grounded in your experience.</p>
+            <ul className={styles.suggestedPrompts} aria-label="Suggested job-search prompts">
+              {JOB_SEARCH_STARTERS.map((text) => (
+                <li key={text}>
+                  <button
+                    type="button"
+                    className={styles.suggestedPrompt}
+                    disabled={!connected || status !== "ready"}
+                    onClick={() => void sendMessage({ text })}
+                  >
+                    {text}
+                  </button>
+                </li>
+              ))}
+            </ul>
           </div>
         )}
-        {messages.map((message) => (
-          <MessageScrollerItem key={message.id} messageId={message.id} scrollAnchor={message.role === "user"}>
+        {messages.map((message, index) => {
+          const jobResults = message.role === "assistant"
+            ? extractJobSearchFromMessageParts(message.parts)
+            : null;
+          const bodyText = textFromMessage(message);
+          const anchorToEnd = index === messages.length - 1;
+          return (
+          <MessageScrollerItem
+            key={message.id}
+            messageId={message.id}
+            scrollAnchor={anchorToEnd}
+            className={styles.messageScrollItem}
+          >
             <Message align={message.role === "user" ? "end" : "start"}>
               <MessageContent>
                 <Bubble align={message.role === "user" ? "end" : "start"} variant={message.role === "user" ? "muted" : "ghost"} className={message.role === "user" ? styles.userMessage : styles.assistantMessage}>
                   <BubbleContent className={styles.bubbleContent}>
                     <p className={styles.messageAuthor}>{message.role === "user" ? "You" : "TAL"}</p>
-                    {message.parts.map((part, index) => part.type === "text" ? (
-                      <p key={index} className={styles.messageText}>{part.text}</p>
-                    ) : null)}
+                    {bodyText ? (
+                      <p className={styles.messageText}>{bodyText}</p>
+                    ) : message.parts.map((part, partIndex) => {
+                      const chunk = textFromMessagePart(part);
+                      return chunk ? (
+                        <p key={partIndex} className={styles.messageText}>{chunk}</p>
+                      ) : null;
+                    })}
+                    {jobResults && <JobSearchCards jobs={jobResults} />}
                   </BubbleContent>
                 </Bubble>
               </MessageContent>
             </Message>
           </MessageScrollerItem>
-        ))}
-        {status === "submitted" && <p className={styles.replyStatus} role="status">TAL is preparing a reply…</p>}
+          );
+        })}
+        {(status === "submitted" || status === "streaming") && (
+          <p className={styles.replyStatus} role="status">
+            {status === "streaming" ? "TAL is typing…" : "TAL is preparing a reply…"}
+          </p>
+        )}
         </MessageScrollerContent>
       </MessageScrollerViewport>
       <MessageScrollerButton />
       </MessageScroller>
       </MessageScrollerProvider>
-      {status === "error" && <p role="alert" className={styles.error}>TAL could not reply. Try sending your message again.</p>}
+      {(status === "error" || chatError) && (
+        <p role="alert" className={styles.error}>
+          TAL could not reply. {chatError instanceof Error ? chatError.message : "Try sending your message again."}
+        </p>
+      )}
       <TalComposer id="chat-message" onSend={send} disabled={!connected || status !== "ready"} attachedName={attachment} />
     </div>
   );
@@ -273,7 +314,7 @@ function ConversationView({ id, host }: { id: string; host: string }) {
 
   if (token) return (
     <Suspense fallback={<div className={styles.startView}><div className={styles.noConversation}><p className={styles.eyebrow}>Your conversation</p><h1>Loading your chat…</h1></div></div>}>
-      <ConnectedConversationView id={id} host={host} token={token} />
+      <ConnectedConversationView id={id} fallbackHost={host} token={token} />
     </Suspense>
   );
 
@@ -300,6 +341,15 @@ function StartConversationView({ onStart }: { onStart: (text: string, file: File
         <h1>A conversation starts here.</h1>
         <p>Ask TAL about your job search, or attach a résumé for an answer grounded in your experience.</p>
       </div>
+      <ul className={styles.suggestedPrompts} aria-label="Suggested job-search prompts">
+        {JOB_SEARCH_STARTERS.map((text) => (
+          <li key={text}>
+            <button type="button" className={styles.suggestedPrompt} onClick={() => void onStart(text, null)}>
+              {text}
+            </button>
+          </li>
+        ))}
+      </ul>
       <TalComposer id="new-chat-message" onSend={async (text, file) => {
         const started = await onStart(text, file);
         if (!started) throw new Error("Could not create a chat. Please try again.");
@@ -308,7 +358,7 @@ function StartConversationView({ onStart }: { onStart: (text: string, file: File
   );
 }
 
-export default function ChatWorkspace({ host, section = "chat" }: { host: string; section?: "chat" | "jobs" }) {
+export default function ChatWorkspace({ host, section = "chat" }: { host: string; section?: "chat" | "jobs" | "applications" }) {
   const [user, setUser] = useState<CurrentUser | null>(null);
   const [authState, setAuthState] = useState<"checking" | "signed-out" | "unavailable" | "signed-in">("checking");
   const [authAttempt, setAuthAttempt] = useState(0);
@@ -326,7 +376,7 @@ export default function ChatWorkspace({ host, section = "chat" }: { host: string
 
   useEffect(() => {
     const controller = new AbortController();
-    fetch("/backend/api/v1/auth/me", { credentials: "include", signal: controller.signal })
+    apiFetch("/backend/api/v1/auth/me", { signal: controller.signal })
       .then(async (response) => {
         if (response.status === 401) { setAuthState("signed-out"); return; }
         if (!response.ok) throw new Error("Could not check sign-in status");
@@ -362,13 +412,13 @@ export default function ChatWorkspace({ host, section = "chat" }: { host: string
       if (file) {
         const body = new FormData();
         body.append("file", file);
-        const uploaded = await fetch(`/backend/api/v1/conversations/${item.id}/attachment`, { method: "POST", credentials: "include", body });
+        const uploaded = await apiFetch(`/backend/api/v1/conversations/${item.id}/attachment`, { method: "POST", body });
         if (!uploaded.ok) throw new Error("Could not attach that résumé.");
       }
       if (text || file) sessionStorage.setItem(`tal:pending:${item.id}`, text || "What should I know about my attached résumé?");
       setItems((current) => [item, ...current]);
       setSelected(item.id);
-      if (section === "jobs") window.location.assign(`/chat?conversation=${item.id}`);
+      if (section !== "chat") window.location.assign(`/chat?conversation=${item.id}`);
       setError("");
       return true;
     } catch (failure) {
@@ -392,7 +442,7 @@ export default function ChatWorkspace({ host, section = "chat" }: { host: string
   }
 
   async function logout() {
-    const response = await fetch("/backend/api/v1/auth/logout", { method: "POST", credentials: "include" });
+    const response = await apiFetch("/backend/api/v1/auth/logout", { method: "POST" });
     if (!response.ok) throw new Error("Could not log out");
     setUser(null);
     setAuthState("signed-out");
@@ -405,9 +455,9 @@ export default function ChatWorkspace({ host, section = "chat" }: { host: string
       <main className={styles.authGate}>
         <Link href="/" className={styles.authBrand}><span className={styles.brandTile}>T</span>TAL</Link>
         <div className={styles.authDialog} role="dialog" aria-label="Sign in to TAL">
-          <p className={styles.eyebrow}>TAL / {section === "jobs" ? "Jobs" : "Chat"}</p>
+          <p className={styles.eyebrow}>TAL / {section === "jobs" ? "Jobs" : section === "applications" ? "Applications" : "Chat"}</p>
           <h1>{authState === "checking" ? "Checking your account…" : authState === "unavailable" ? "We couldn’t reach TAL." : "Please sign in."}</h1>
-          <p>{authState === "checking" ? "Your workspace will appear in a moment." : authState === "unavailable" ? "Check your connection and try again." : section === "jobs" ? "Sign in to watch company boards and see open jobs." : "Sign in to see your conversations and start a new chat."}</p>
+          <p>{authState === "checking" ? "Your workspace will appear in a moment." : authState === "unavailable" ? "Check your connection and try again." : section === "jobs" ? "Sign in to watch company boards and see open jobs." : section === "applications" ? "Sign in to manage your applications." : "Sign in to see your conversations and start a new chat."}</p>
           {authState === "signed-out" && <Link href="/login" className={styles.signInButton}>Sign in <ArrowRight aria-hidden="true" size={18} /></Link>}
           {authState === "unavailable" && <button type="button" className={styles.signInButton} onClick={() => { setAuthState("checking"); setAuthAttempt((attempt) => attempt + 1); }}>Retry <ArrowRight aria-hidden="true" size={18} /></button>}
         </div>
@@ -418,14 +468,14 @@ export default function ChatWorkspace({ host, section = "chat" }: { host: string
   return (
     <TooltipProvider>
     <div className={styles.workspace}>
-      <ChatSidebar items={items} selected={activeConversation} section={section} onCreate={create} onSelect={(id) => { if (section === "jobs") window.location.assign(`/chat?conversation=${id}`); else setSelected(id); }} onRemove={remove} loading={loading} error={sidebarError} onRetry={() => { void loadConversations(); }} user={user} onLogout={logout} />
+      <ChatSidebar items={items} selected={activeConversation} section={section} onCreate={create} onSelect={(id) => { if (section !== "chat") window.location.assign(`/chat?conversation=${id}`); else setSelected(id); }} onRemove={remove} loading={loading} error={sidebarError} onRetry={() => { void loadConversations(); }} user={user} onLogout={logout} />
       <main className={styles.main}>
         <div className={styles.topBar}>
-          <span>Workspace / {section === "jobs" ? "Jobs" : "Chat"}</span>
-          {section === "jobs" && <Link href="/chat" className={styles.topBarLink}>Chat</Link>}
+          <span>Workspace / {section === "jobs" ? "Jobs" : section === "applications" ? "Applications" : "Chat"}</span>
+          {section !== "chat" && <Link href="/chat" className={styles.topBarLink}>Chat</Link>}
         </div>
         {error && <p role="alert" className={styles.error}>{error}</p>}
-        {section === "jobs" ? <JobsView /> : activeConversation ? <ConversationView key={activeConversation} id={activeConversation} host={host} /> : <StartConversationView onStart={start} />}
+        {section === "jobs" ? <JobsView /> : section === "applications" ? <ApplicationsView /> : activeConversation ? <ConversationView key={activeConversation} id={activeConversation} host={host} /> : <StartConversationView onStart={start} />}
       </main>
     </div>
     </TooltipProvider>

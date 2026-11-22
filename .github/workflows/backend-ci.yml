@@ -17,6 +17,8 @@ jobs:
     env:
       DATABASE_URL: "sqlite+aiosqlite:///:memory:"
       JWT_SECRET_KEY: "ci-only-jwt-secret"
+      JOB_SCAN_SECRET: "ci-only-job-scan-secret"
+      CHAT_TOOL_SECRET: "ci-only-chat-tool-secret"
       GOOGLE_CLIENT_ID: "ci-only-google-client-id"
       GOOGLE_CLIENT_SECRET: "ci-only-google-client-secret"
       GOOGLE_REDIRECT_URI: "http://localhost:8000/api/v1/auth/google/callback"
@@ -26,6 +28,7 @@ jobs:
       R2_BUCKET_NAME: "ci-only-r2-bucket"
       R2_ENDPOINT_URL: "https://example.invalid"
       OAUTH_STATE_SECRET: "ci-only-oauth-state-secret"
+      AUTH_RATE_LIMIT_BACKEND: "memory"
 
     steps:
       - name: Check out repository

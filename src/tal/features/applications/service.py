@@ -61,3 +61,14 @@ async def update_application_status(
     await session.commit()
     await session.refresh(application)
     return ApplicationRead.model_validate(application)
+
+
+async def delete_application(application_id: UUID, session: AsyncSession, user_id: UUID) -> None:
+    result = await session.execute(
+        select(Application).where(Application.id == application_id, Application.user_id == user_id)
+    )
+    application = result.scalar_one_or_none()
+    if application is None:
+        raise ApplicationNotFoundError(application_id)
+    await session.delete(application)
+    await session.commit()

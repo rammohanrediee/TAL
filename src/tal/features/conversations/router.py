@@ -112,7 +112,7 @@ async def create_connection_token(
     conversation = await owned_conversation(conversation_id, current_user.id, session)
     if conversation.deleted_at is not None:
         raise HTTPException(status_code=404, detail="Conversation not found")
-    expires_at = datetime.now(UTC) + timedelta(seconds=60)
+    expires_at = datetime.now(UTC) + timedelta(minutes=settings.chat_connection_expire_minutes)
     token = jwt.encode(
         {
             "sub": str(current_user.id),

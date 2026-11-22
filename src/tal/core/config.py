@@ -19,10 +19,20 @@ class Settings(BaseSettings):
     database_url: str
     database_url_unpooled: str | None = None
     redis_url: str = "redis://localhost:6379/0"
+    auth_rate_limit_backend: Literal["redis", "memory"] = "redis"
+    auth_rate_limit_window_seconds: int = 60
+    auth_rate_limit_login_per_minute: int = 15
+    auth_rate_limit_login_email_per_minute: int = 10
+    auth_rate_limit_register_per_minute: int = 5
+    auth_rate_limit_oauth_per_minute: int = 30
+    auth_csrf_enabled: bool = True
     secret_key: SecretStr = SecretStr("development-only-change-me")
     access_token_expire_minutes: int = 30
     jwt_secret_key: SecretStr
     jwt_algorithm: str = "HS256"
+    job_scan_secret: SecretStr
+    chat_tool_secret: SecretStr
+    chat_connection_expire_minutes: int = 30
     google_client_id: SecretStr | None = None
     google_client_secret: SecretStr | None = None
     google_redirect_uri: str | None = None

@@ -18,6 +18,8 @@
     "required": [
       "DATABASE_URL",
       "JWT_SECRET_KEY",
+      "JOB_SCAN_SECRET",
+      "CHAT_TOOL_SECRET",
       "R2_ACCOUNT_ID",
       "R2_ACCESS_KEY_ID",
       "R2_SECRET_ACCESS_KEY",

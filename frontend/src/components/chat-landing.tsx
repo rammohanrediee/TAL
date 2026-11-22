@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, type FormEvent } from "react";
+import { apiFetch } from "@/lib/api";
 
 export default function ChatLanding() {
   const router = useRouter();
@@ -17,7 +18,7 @@ export default function ChatLanding() {
 
   useEffect(() => {
     sessionStorage.removeItem("tal:home-draft");
-    fetch("/backend/api/v1/auth/me", { credentials: "include" })
+    apiFetch("/backend/api/v1/auth/me")
       .then((response) => setSignedIn(response.ok))
       .catch(() => setSignedIn(false));
   }, []);
@@ -33,17 +34,15 @@ export default function ChatLanding() {
     setBusy(true);
     setError("");
     try {
-      const created = await fetch("/backend/api/v1/conversations", {
-        method: "POST", credentials: "include",
-      });
+      const created = await apiFetch("/backend/api/v1/conversations", { method: "POST" });
       if (created.status === 401) return signIn();
       if (!created.ok) throw new Error("Could not start a chat.");
       const { id } = await created.json() as { id: string };
       if (file) {
         const body = new FormData();
         body.append("file", file);
-        const uploaded = await fetch(`/backend/api/v1/conversations/${id}/attachment`, {
-          method: "POST", credentials: "include", body,
+        const uploaded = await apiFetch(`/backend/api/v1/conversations/${id}/attachment`, {
+          method: "POST", body,
         });
         if (!uploaded.ok) {
           const data = await uploaded.json().catch(() => ({})) as { message?: string };

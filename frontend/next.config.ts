@@ -1,8 +1,10 @@
 import type { NextConfig } from "next";
 
 const apiUrl = process.env.TAL_API_URL ?? "http://127.0.0.1:8000";
+const chatUrl = process.env.TAL_CHAT_URL ?? process.env.TAL_API_URL ?? "http://127.0.0.1:8787";
 
 const nextConfig: NextConfig = {
+  transpilePackages: ["@astryxdesign/core"],
   devIndicators: false,
   turbopack: { root: __dirname },
   allowedDevOrigins: ["127.0.0.1"],
@@ -11,6 +13,10 @@ const nextConfig: NextConfig = {
       {
         source: "/backend/:path*",
         destination: `${apiUrl}/:path*`,
+      },
+      {
+        source: "/agents/:path*",
+        destination: `${chatUrl}/agents/:path*`,
       },
     ];
   },

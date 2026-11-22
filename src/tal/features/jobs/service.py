@@ -193,6 +193,8 @@ async def list_jobs(
     since_days: int | None = None,
     live_only: bool = True,
     offset: int = 0,
+    include_description_in_query: bool = False,
+    limit: int = 51,
 ) -> list[tuple[JobPosting, JobBoard]]:
     statement = (
         select(JobPosting, JobBoard)
@@ -205,12 +207,13 @@ async def list_jobs(
     if live_only:
         statement = statement.where(JobPosting.is_live.is_(True))
     if query:
-        statement = statement.where(
-            or_(
-                JobPosting.title.ilike(f"%{query}%"),
-                JobBoard.company_name.ilike(f"%{query}%"),
-            )
-        )
+        query_clause = [
+            JobPosting.title.ilike(f"%{query}%"),
+            JobBoard.company_name.ilike(f"%{query}%"),
+        ]
+        if include_description_in_query:
+            query_clause.append(JobPosting.description.ilike(f"%{query}%"))
+        statement = statement.where(or_(*query_clause))
     if location:
         statement = statement.where(JobPosting.location.ilike(f"%{location}%"))
     if work_mode:
@@ -222,6 +225,6 @@ async def list_jobs(
             JobPosting.first_seen_at >= datetime.now(UTC) - timedelta(days=since_days)
         )
     result = await session.execute(
-        statement.order_by(JobPosting.last_seen_at.desc(), JobPosting.id).offset(offset).limit(51)
+        statement.order_by(JobPosting.last_seen_at.desc(), JobPosting.id).offset(offset).limit(limit)
     )
     return list(result.all())
