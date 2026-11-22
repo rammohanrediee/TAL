@@ -12,9 +12,11 @@ RUN python -m pip install --no-cache-dir --upgrade "pip>=26.2.0" \
 
 COPY alembic.ini ./
 COPY migrations/ ./migrations/
+COPY start-api.sh ./start-api.sh
 
-RUN useradd --system --uid 10001 --create-home tal
+RUN chmod 755 /app/start-api.sh \
+    && useradd --system --uid 10001 --create-home tal
 USER tal
 
 EXPOSE 8000
-CMD ["uvicorn", "tal.main:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["/app/start-api.sh"]

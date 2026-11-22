@@ -245,7 +245,7 @@ export class TalContainer extends DurableObject<Env> {
     const container = this.ctx.container!;
     const image = container.images.base;
     // Bump when container env must be reapplied. A running container keeps its old env.
-    const envRevision = "google-oauth-1";
+    const envRevision = "migrate-search-context-1";
     const storedRevision = await this.ctx.storage.get<string>("container-env-rev");
     const running = await container.inspect();
     if (storedRevision !== envRevision && running) {
