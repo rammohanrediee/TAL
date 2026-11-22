@@ -123,24 +123,35 @@
 
 .composerDock { padding: 10px clamp(14px, 5vw, 60px) 14px; border-top: 1px solid var(--chat-border); background: var(--chat-canvas); }
 .composerForm { max-width: 824px; margin: auto; }
-/* Astryx ChatComposer — TAL dark pill bar */
 .astryxComposer {
   width: 100%;
-  --color-background-popover: var(--chat-ink);
-  --color-text-primary: var(--chat-surface);
-  --color-text-secondary: var(--tal-border-strong);
-  --color-text-disabled: var(--tal-muted);
-  --color-border-emphasized: var(--chat-secondary);
-  --color-accent: var(--chat-accent);
-  --color-accent-muted: color-mix(in srgb, var(--chat-accent) 35%, transparent);
-  --color-on-accent: var(--tal-ink);
   --radius-chat: 14px;
 }
-.astryxComposer:focus-within { outline: 2px solid var(--chat-accent); outline-offset: 2px; }
-.astryxDrawer { padding: 0 4px 6px; }
-.astryxAttachButton { color: var(--chat-surface) !important; }
+
+/* Astryx ChatComposer (elevation="none"): keep flat border, no terracotta/accent rings */
+.astryxComposer > div:has([contenteditable="true"], textarea):focus-within {
+  border-color: var(--chat-border) !important;
+  box-shadow: none !important;
+  outline: none !important;
+}
+
+.astryxComposer > div:has([contenteditable="true"], textarea):hover {
+  box-shadow: none !important;
+}
+
+.astryxComposer :where([contenteditable="true"], textarea):focus-visible {
+  outline: none !important;
+  box-shadow: none !important;
+}
+
+.astryxComposer :where(button, a, [role="button"]):focus-visible {
+  outline: 2px solid var(--chat-border) !important;
+  outline-offset: 2px;
+  box-shadow: none !important;
+}
+
 .composer { display: block; width: 100%; height: auto; padding: 10px 12px; border: 1px solid var(--chat-ink); border-radius: 14px; background: var(--chat-ink); color: var(--chat-surface); }
-.composer:focus-within { outline: 2px solid var(--chat-accent); outline-offset: 2px; }
+.composer:focus-within { outline: none; }
 .composerHeader { padding: 0; }
 .inputGroup { display: block; width: 100%; height: auto; border: 0; background: transparent; }
 .composerLabel { display: block; margin: 0 2px 4px; color: var(--chat-accent); font-size: 11px; font-weight: 800; }

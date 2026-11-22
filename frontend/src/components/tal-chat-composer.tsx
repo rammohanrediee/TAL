@@ -1,16 +1,11 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
-import {
-  ChatComposer,
-  ChatSendButton,
-} from "@astryxdesign/core/Chat";
-import {
-  ChatComposerAttachButton,
-  ChatComposerAttachments,
-  LocalChatComposerProvider,
-  useChatComposer,
-} from "@/components/ui/chat-composer";
+import { useCallback, useId, useRef, useState } from "react";
+import { ChatComposer, ChatComposerDrawer, ChatSendButton } from "@astryxdesign/core/Chat";
+import { Button } from "@astryxdesign/core/Button";
+import { Icon } from "@astryxdesign/core/Icon";
+import { Text } from "@astryxdesign/core/Text";
+import { PaperClipIcon } from "@heroicons/react/24/outline";
 import styles from "./chat-workspace.module.css";
 
 const RESUME_ACCEPT = ".pdf,.docx";
@@ -23,46 +18,6 @@ type TalChatComposerProps = {
   attachedName?: string;
 };
 
-function ResumeAttachControl({
-  onFile,
-  onValidationError,
-}: {
-  onFile: (file: File | null) => void;
-  onValidationError: (message: string) => void;
-}) {
-  const { state, actions } = useChatComposer();
-
-  useEffect(() => {
-    if (state.attachments.length > 1) {
-      onValidationError("Attach one résumé at a time.");
-      for (const extra of state.attachments.slice(1)) {
-        actions.removeAttachment(extra.id);
-      }
-      return;
-    }
-
-    const file = state.attachments[0]?.file ?? null;
-    if (file && file.size > RESUME_MAX_BYTES) {
-      onValidationError("Résumé must be 5 MB or smaller.");
-      actions.removeAttachment(state.attachments[0].id);
-      onFile(null);
-      return;
-    }
-
-    onFile(file);
-    if (file) onValidationError("");
-  }, [state.attachments, actions, onFile, onValidationError]);
-
-  return (
-    <ChatComposerAttachButton
-      accept={RESUME_ACCEPT}
-      multiple={false}
-      label="Attach PDF or DOCX résumé"
-      className={styles.astryxAttachButton}
-    />
-  );
-}
-
 export function TalChatComposer({
   id,
   onSend,
@@ -72,10 +27,21 @@ export function TalChatComposer({
   const [error, setError] = useState("");
   const [value, setValue] = useState("");
   const [resumeFile, setResumeFile] = useState<File | null>(null);
-  const [attachEpoch, setAttachEpoch] = useState(0);
+  const fileInputId = useId();
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const onValidationError = useCallback((message: string) => {
-    if (message) setError(message);
+  const onPickResume = useCallback((file: File | null) => {
+    if (!file) {
+      setResumeFile(null);
+      return;
+    }
+    if (file.size > RESUME_MAX_BYTES) {
+      setError("Résumé must be 5 MB or smaller.");
+      setResumeFile(null);
+      return;
+    }
+    setError("");
+    setResumeFile(file);
   }, []);
 
   const performSend = useCallback(
@@ -87,12 +53,13 @@ export function TalChatComposer({
         setError("");
         setValue("");
         setResumeFile(null);
-        setAttachEpoch((epoch) => epoch + 1);
+        if (fileInputRef.current) {
+          fileInputRef.current.value = "";
+        }
       } catch (caught) {
         const message =
           caught instanceof Error ? caught.message : "Could not send your message.";
         setError(message);
-        // Astryx clears the field on submit; restore the draft after a failure.
         setValue(text);
       }
     },
@@ -100,15 +67,15 @@ export function TalChatComposer({
   );
 
   const canSend = Boolean(value.trim() || resumeFile) && !disabled;
+  const resumeLabel = resumeFile?.name ?? attachedName;
 
   const drawer =
-    resumeFile || attachedName ? (
-      <div className={styles.astryxDrawer}>
-        <ChatComposerAttachments className={styles.attachmentList} />
-        {attachedName && !resumeFile ? (
-          <p className={styles.attachment}>Résumé attached · {attachedName}</p>
-        ) : null}
-      </div>
+    resumeLabel ? (
+      <ChatComposerDrawer count={1} label="Résumé">
+        <Text type="supporting" color="secondary">
+          {resumeLabel}
+        </Text>
+      </ChatComposerDrawer>
     ) : undefined;
 
   return (
@@ -119,37 +86,41 @@ export function TalChatComposer({
         </p>
       ) : null}
       <div className={styles.composerForm}>
-        <LocalChatComposerProvider
-          key={attachEpoch}
+        <input
+          ref={fileInputRef}
+          id={fileInputId}
+          type="file"
+          accept={RESUME_ACCEPT}
+          hidden
           disabled={disabled}
-          onSubmit={async () => {}}
-          canSubmit={() => false}
-        >
-          <ChatComposer
-            id={id}
-            className={styles.astryxComposer}
-            density="compact"
-            elevation="none"
-            isDisabled={disabled}
-            value={value}
-            onChange={setValue}
-            onSubmit={performSend}
-            placeholder="Ask TAL about a role, your résumé, or your next move…"
-            footerActions={
-              <ResumeAttachControl
-                onFile={setResumeFile}
-                onValidationError={onValidationError}
-              />
-            }
-            drawer={drawer}
-            sendButton={
-              <ChatSendButton
-                isDisabled={!canSend}
-                onSend={() => performSend(value)}
-              />
-            }
-          />
-        </LocalChatComposerProvider>
+          onChange={(event) => {
+            const file = event.target.files?.[0] ?? null;
+            onPickResume(file);
+          }}
+        />
+        <ChatComposer
+          id={id}
+          className={styles.astryxComposer}
+          elevation="none"
+          isDisabled={disabled}
+          value={value}
+          onChange={setValue}
+          onSubmit={performSend}
+          placeholder="Ask TAL about a role, your résumé, or your next move…"
+          drawer={drawer}
+          footerActions={
+            <Button
+              label="Attach PDF or DOCX résumé"
+              variant="ghost"
+              size="md"
+              icon={<Icon icon={PaperClipIcon} size="sm" />}
+              isIconOnly
+              isDisabled={disabled}
+              onClick={() => fileInputRef.current?.click()}
+            />
+          }
+          sendButton={<ChatSendButton isDisabled={!canSend} onSend={() => performSend(value)} />}
+        />
       </div>
     </div>
   );

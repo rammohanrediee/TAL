@@ -19,7 +19,32 @@ import { apiFetch } from "@/lib/api";
 import styles from "./chat-workspace.module.css";
 
 type Conversation = { id: string; title: string; created_at: string };
-type CurrentUser = { id: string; email: string; is_active: boolean };
+type CurrentUser = { id: string; email: string; is_active: boolean; name?: string | null; full_name?: string | null };
+
+function getTimeGreeting(now = new Date()): string {
+  const hour = now.getHours();
+  if (hour >= 5 && hour <= 11) return "Good morning";
+  if (hour >= 12 && hour <= 16) return "Good afternoon";
+  if (hour >= 17 && hour <= 21) return "Good evening";
+  return "Good night";
+}
+
+function titleCaseLocalPart(segment: string): string {
+  const letters = segment.replace(/\d+$/, "");
+  const source = letters.length > 0 ? letters : segment;
+  return source.charAt(0).toUpperCase() + source.slice(1).toLowerCase();
+}
+
+function getDisplayName(user: CurrentUser): string {
+  const fromApi = user.name?.trim() || user.full_name?.trim();
+  if (fromApi) {
+    const first = fromApi.split(/\s+/)[0] ?? fromApi;
+    return first.charAt(0).toUpperCase() + first.slice(1);
+  }
+  const local = user.email.split("@")[0] ?? "";
+  const segment = local.includes(".") ? (local.split(".")[0] ?? local) : local;
+  return titleCaseLocalPart(segment);
+}
 
 const JOB_SEARCH_STARTERS = [
   "Find remote Python backend roles posted in the last 30 days",
@@ -333,12 +358,14 @@ function ConversationView({ id, host }: { id: string; host: string }) {
   );
 }
 
-function StartConversationView({ onStart }: { onStart: (text: string, file: File | null) => Promise<boolean> }) {
+function StartConversationView({ user, onStart }: { user: CurrentUser; onStart: (text: string, file: File | null) => Promise<boolean> }) {
+  const displayName = getDisplayName(user);
+  const heroTitle = `${getTimeGreeting()}, ${displayName}. How can I help you?`;
+
   return (
     <div className={styles.startView}>
       <div className={styles.noConversation}>
-        <p className={styles.eyebrow}>Your workspace</p>
-        <h1>A conversation starts here.</h1>
+        <h1>{heroTitle}</h1>
         <p>Ask TAL about your job search, or attach a résumé for an answer grounded in your experience.</p>
       </div>
       <ul className={styles.suggestedPrompts} aria-label="Suggested job-search prompts">
@@ -471,11 +498,11 @@ export default function ChatWorkspace({ host, section = "chat" }: { host: string
       <ChatSidebar items={items} selected={activeConversation} section={section} onCreate={create} onSelect={(id) => { if (section !== "chat") window.location.assign(`/chat?conversation=${id}`); else setSelected(id); }} onRemove={remove} loading={loading} error={sidebarError} onRetry={() => { void loadConversations(); }} user={user} onLogout={logout} />
       <main className={styles.main}>
         <div className={styles.topBar}>
-          <span>Workspace / {section === "jobs" ? "Jobs" : section === "applications" ? "Applications" : "Chat"}</span>
+          <span>{section === "jobs" ? "Jobs" : section === "applications" ? "Applications" : "Chat"}</span>
           {section !== "chat" && <Link href="/chat" className={styles.topBarLink}>Chat</Link>}
         </div>
         {error && <p role="alert" className={styles.error}>{error}</p>}
-        {section === "jobs" ? <JobsView /> : section === "applications" ? <ApplicationsView /> : activeConversation ? <ConversationView key={activeConversation} id={activeConversation} host={host} /> : <StartConversationView onStart={start} />}
+        {section === "jobs" ? <JobsView /> : section === "applications" ? <ApplicationsView /> : activeConversation ? <ConversationView key={activeConversation} id={activeConversation} host={host} /> : <StartConversationView user={user} onStart={start} />}
       </main>
     </div>
     </TooltipProvider>

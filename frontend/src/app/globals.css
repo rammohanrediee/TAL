@@ -1,5 +1,12 @@
+@layer reset, theme, base, astryx-base, astryx-theme, components, utilities;
+
+@import "@astryxdesign/theme-neutral/fonts.css";
 @import "tailwindcss";
 @import "shadcn/tailwind.css";
+@import "@astryxdesign/core/reset.css";
+@import "@astryxdesign/core/astryx.css";
+@import "@astryxdesign/theme-neutral/theme.css";
+@import "@astryxdesign/core/tailwind-theme.css";
 
 :root {
   --font-geist-sans: Arial, Helvetica, sans-serif;
