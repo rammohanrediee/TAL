@@ -256,6 +256,8 @@ export class TalContainer extends DurableObject<Env> {
         env: {
           APP_ENV: "production",
           APP_DEBUG: "false",
+          // Single container, no Redis service. In-memory limits still apply per instance.
+          AUTH_RATE_LIMIT_BACKEND: "memory",
           ...Object.fromEntries(
             REQUIRED_SETTINGS.map((name) => [name, this.env[name]]),
           ),
