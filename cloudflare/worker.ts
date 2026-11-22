@@ -244,8 +244,14 @@ export class TalContainer extends DurableObject<Env> {
   private async startAndWaitForHealth(): Promise<void> {
     const container = this.ctx.container!;
     const image = container.images.base;
+    // Bump when container env must be reapplied. A running container keeps its old env.
+    const envRevision = "google-oauth-1";
+    const storedRevision = await this.ctx.storage.get<string>("container-env-rev");
     const running = await container.inspect();
-    if (running && running.image !== "" && running.image !== image) {
+    if (storedRevision !== envRevision && running) {
+      await container.destroy();
+    }
+    if (running && running.image !== "" && running.image !== image && container.running) {
       await container.destroy();
     }
     if (!container.running) {
@@ -282,7 +288,10 @@ export class TalContainer extends DurableObject<Env> {
           signal: AbortSignal.timeout(1000),
         });
         await response.body?.cancel();
-        if (response.ok) return;
+        if (response.ok) {
+          await this.ctx.storage.put("container-env-rev", envRevision);
+          return;
+        }
       } catch {
         // The HTTP server may still be starting.
       }
