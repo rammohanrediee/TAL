@@ -216,6 +216,11 @@ container image builds on GitHub-hosted runners (Docker) instead of your local m
 rotate those with `wrangler secret put <NAME>` or the Cloudflare dashboard, not in the
 workflow.
 
+When the database host is a Neon **pooler** URL, also set `DATABASE_URL_UNPOOLED` to the
+direct (non-pooler) Postgres URL. The API container runs `alembic upgrade head` on start;
+DDL through the pooler fails or no-ops, which leaves production missing columns such as
+`conversations.search_context`.
+
 ## Vercel frontend deployment
 
 Import the repository into Vercel with **Root Directory set to `frontend`**.

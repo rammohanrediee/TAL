@@ -28,6 +28,7 @@ interface Env extends Record<RequiredSetting, string> {
   TAL_CONTAINER: DurableObjectNamespace<TalContainer>;
   TalChatAgent: DurableObjectNamespace<TalChatAgent>;
   AI: Ai;
+  DATABASE_URL_UNPOOLED?: string;
   GOOGLE_CLIENT_ID?: string;
   GOOGLE_CLIENT_SECRET?: string;
   GOOGLE_REDIRECT_URI?: string;
@@ -246,7 +247,7 @@ export class TalContainer extends DurableObject<Env> {
     const container = this.ctx.container!;
     const image = container.images.base;
     // Bump when container env must be reapplied. A running container keeps its old env.
-    const envRevision = "migrate-search-context-1";
+    const envRevision = "migrate-unpooled-2";
     const storedRevision = await this.ctx.storage.get<string>("container-env-rev");
     const running = await container.inspect();
     if (storedRevision !== envRevision && running) {
@@ -268,6 +269,9 @@ export class TalContainer extends DurableObject<Env> {
           ...Object.fromEntries(
             REQUIRED_SETTINGS.map((name) => [name, this.env[name]]),
           ),
+          ...(this.env.DATABASE_URL_UNPOOLED && {
+            DATABASE_URL_UNPOOLED: this.env.DATABASE_URL_UNPOOLED,
+          }),
           ...(this.env.GOOGLE_CLIENT_ID && { GOOGLE_CLIENT_ID: this.env.GOOGLE_CLIENT_ID }),
           ...(this.env.GOOGLE_CLIENT_SECRET && { GOOGLE_CLIENT_SECRET: this.env.GOOGLE_CLIENT_SECRET }),
           ...(this.env.GOOGLE_REDIRECT_URI && { GOOGLE_REDIRECT_URI: this.env.GOOGLE_REDIRECT_URI }),
