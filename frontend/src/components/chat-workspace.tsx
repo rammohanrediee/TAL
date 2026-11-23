@@ -79,8 +79,15 @@ function subscribeChatHost(callback: () => void) {
 }
 
 function chatAgentHost(fallbackHost: string): string {
-  const explicit = process.env.NEXT_PUBLIC_TAL_CHAT_URL;
-  if (explicit) return new URL(explicit).host;
+  const explicit = process.env.NEXT_PUBLIC_TAL_CHAT_URL?.trim();
+  if (explicit) {
+    const source = explicit.includes("://") ? explicit : `https://${explicit}`;
+    return new URL(source).host;
+  }
+  // Vercel cannot reliably proxy WebSockets; connect to the Worker host from build-time env.
+  if (fallbackHost && !/^(127\.0\.0\.1|localhost)(:\d+)?$/i.test(fallbackHost)) {
+    return fallbackHost;
+  }
   if (typeof window !== "undefined") return window.location.host;
   return fallbackHost;
 }
@@ -181,7 +188,12 @@ function ChatSidebar({ items, selected, section, onCreate, onSelect, onRemove, l
 async function conversations(path = "", init?: RequestInit) {
   const response = await apiFetch(`/backend/api/v1/conversations${path}`, init);
   if (response.status === 401) throw new Error("signed-out");
-  if (!response.ok) throw new Error("Chat request failed");
+  if (!response.ok) {
+    const data = await response.json().catch(() => ({})) as { code?: string; detail?: string };
+    if (response.status === 403 && data.code === "csrf_failed") throw new Error("csrf");
+    if (response.status === 503) throw new Error("unavailable");
+    throw new Error(data.detail ? String(data.detail) : `Chat request failed (${response.status})`);
+  }
   return response.status === 204 ? null : response.json();
 }
 
@@ -194,7 +206,17 @@ function TalComposer(props: {
   return <TalChatComposer {...props} />;
 }
 
-function ConnectedConversationView({ id, fallbackHost, token }: { id: string; fallbackHost: string; token: string }) {
+function ConnectedConversationView({
+  id,
+  fallbackHost,
+  token,
+  onConnectionLost,
+}: {
+  id: string;
+  fallbackHost: string;
+  token: string;
+  onConnectionLost?: () => void;
+}) {
   const [connected, setConnected] = useState(false);
   const [attachment, setAttachment] = useState("");
   const agentHost = useSyncExternalStore(subscribeChatHost, () => chatAgentHost(fallbackHost), () => fallbackHost);
@@ -209,6 +231,7 @@ function ConnectedConversationView({ id, fallbackHost, token }: { id: string; fa
     protocols: [token],
     onOpen: () => setConnected(true),
     onClose: () => setConnected(false),
+    onConnectionError: () => onConnectionLost?.(),
   });
   const { messages, sendMessage, status, error: chatError } = useAgentChat({ agent, headers: chatAuthHeaders });
 
@@ -324,22 +347,63 @@ function ConnectedConversationView({ id, fallbackHost, token }: { id: string; fa
   );
 }
 
-function ConversationView({ id, host }: { id: string; host: string }) {
+function ConversationView({
+  id,
+  host,
+  onSessionLost,
+}: {
+  id: string;
+  host: string;
+  onSessionLost?: () => void;
+}) {
   const [token, setToken] = useState<string | null>(null);
   const [failed, setFailed] = useState(false);
+  const [failureDetail, setFailureDetail] = useState("");
   const [attempt, setAttempt] = useState(0);
 
   useEffect(() => {
     let active = true;
+    setFailureDetail("");
     conversations(`/${id}/connection-token`, { method: "POST" })
-      .then((result: { token: string }) => { if (active) { setToken(result.token); setFailed(false); } })
-      .catch(() => { if (active) setFailed(true); });
+      .then((result: { token: string }) => {
+        if (active) {
+          setToken(result.token);
+          setFailed(false);
+          setFailureDetail("");
+        }
+      })
+      .catch((failure: unknown) => {
+        if (!active) return;
+        if (failure instanceof Error) {
+          if (failure.message === "signed-out") {
+            onSessionLost?.();
+            return;
+          }
+          if (failure.message === "csrf") {
+            setFailureDetail("Your session needs a refresh. Sign out and back in, then retry.");
+          } else if (failure.message === "unavailable") {
+            setFailureDetail("TAL is still starting up. Wait a moment and retry.");
+          } else {
+            setFailureDetail(failure.message);
+          }
+        }
+        setFailed(true);
+      });
     return () => { active = false; };
-  }, [id, attempt]);
+  }, [id, attempt, onSessionLost]);
 
   if (token) return (
     <Suspense fallback={<div className={styles.startView}><div className={styles.noConversation}><p className={styles.eyebrow}>Your conversation</p><h1>Loading your chat…</h1></div></div>}>
-      <ConnectedConversationView id={id} fallbackHost={host} token={token} />
+      <ConnectedConversationView
+        id={id}
+        fallbackHost={host}
+        token={token}
+        onConnectionLost={() => {
+          setToken(null);
+          setFailed(true);
+          setFailureDetail("The live chat link dropped. Retry to request a new connection token.");
+        }}
+      />
     </Suspense>
   );
 
@@ -349,10 +413,24 @@ function ConversationView({ id, host }: { id: string; host: string }) {
       <div className={styles.noConversation}>
         <p className={styles.eyebrow}>Your conversation</p>
         <h1>{failed ? "TAL could not connect." : "Connecting to TAL…"}</h1>
-        <p>{failed ? "Your message is saved. Retry when the connection is available." : "Your message will send when the connection is ready."}</p>
+        <p>{failed
+          ? (failureDetail || "Your message is saved. Retry when the connection is available.")
+          : "Your message will send when the connection is ready."}</p>
       </div>
       {pending && <p className={styles.pendingMessage}>Saved message: {pending}</p>}
-      {failed && <button type="button" className={styles.retryButton} onClick={() => { setFailed(false); setAttempt((value) => value + 1); }}>Retry connection</button>}
+      {failed && (
+        <button
+          type="button"
+          className={styles.retryButton}
+          onClick={() => {
+            setFailed(false);
+            setFailureDetail("");
+            setAttempt((value) => value + 1);
+          }}
+        >
+          Retry connection
+        </button>
+      )}
       <TalComposer id="pending-chat-message" disabled onSend={async () => {}} />
     </div>
   );
@@ -502,7 +580,19 @@ export default function ChatWorkspace({ host, section = "chat" }: { host: string
           {section !== "chat" && <Link href="/chat" className={styles.topBarLink}>Chat</Link>}
         </div>
         {error && <p role="alert" className={styles.error}>{error}</p>}
-        {section === "jobs" ? <JobsView /> : section === "applications" ? <ApplicationsView /> : activeConversation ? <ConversationView key={activeConversation} id={activeConversation} host={host} /> : <StartConversationView user={user} onStart={start} />}
+        {section === "jobs" ? <JobsView /> : section === "applications" ? <ApplicationsView /> : activeConversation ? (
+          <ConversationView
+            key={activeConversation}
+            id={activeConversation}
+            host={host}
+            onSessionLost={() => {
+              setUser(null);
+              setAuthState("signed-out");
+            }}
+          />
+        ) : (
+          <StartConversationView user={user} onStart={start} />
+        )}
       </main>
     </div>
     </TooltipProvider>

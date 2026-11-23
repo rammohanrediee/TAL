@@ -219,11 +219,14 @@ workflow.
 ## Vercel frontend deployment
 
 Import the repository into Vercel with **Root Directory set to `frontend`**.
-Set `TAL_API_URL` to the Cloudflare backend's HTTPS origin, without a trailing
-slash, in the Vercel project environment. Set `TAL_CHAT_URL` to the same origin
-so `/agents/*` WebSocket chat routes through Next.js rewrites. The frontend
-rewrites `/backend/*` and `/agents/*` to that origin. The FastAPI backend stays on
-Cloudflare and does not need a Vercel service or binding.
+Set `TAL_API_URL` to the Cloudflare Worker's HTTPS origin, without a trailing
+slash, in the Vercel project environment. Set `TAL_CHAT_URL` to the same origin.
+The frontend rewrites `/backend/*` and `/agents/*` to that origin for HTTP, but
+**live chat WebSockets connect to the Worker host directly** (baked into the client
+as `NEXT_PUBLIC_TAL_CHAT_URL` from `TAL_CHAT_URL` at build time). Vercel does not
+reliably proxy WebSocket upgrades to Cloudflare. Redeploy Vercel after changing
+either URL. The FastAPI backend stays on Cloudflare and does not need a Vercel
+service or binding.
 
 Google sign-in also needs the deployed frontend URL in Cloudflare's
 `FRONTEND_URL` and the matching `/backend/api/v1/auth/google/callback` URL in
