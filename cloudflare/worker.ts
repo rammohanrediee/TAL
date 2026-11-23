@@ -22,17 +22,11 @@ const REQUIRED_SETTINGS = [
   "OAUTH_STATE_SECRET",
 ] as const;
 
-type RequiredSetting = (typeof REQUIRED_SETTINGS)[number];
-
-interface Env extends Record<RequiredSetting, string> {
-  TAL_CONTAINER: DurableObjectNamespace<TalContainer>;
-  TalChatAgent: DurableObjectNamespace<TalChatAgent>;
-  AI: Ai;
+interface Env extends Cloudflare.Env {
   DATABASE_URL_UNPOOLED?: string;
   GOOGLE_CLIENT_ID?: string;
   GOOGLE_CLIENT_SECRET?: string;
   GOOGLE_REDIRECT_URI?: string;
-  FRONTEND_URL?: string;
   CLOUDFLARE_AI_API_TOKEN?: string;
 }
 
@@ -255,7 +249,7 @@ export class TalContainer extends DurableObject<Env> {
     const container = this.ctx.container!;
     const image = container.images.base;
     // Bump when container env must be reapplied. A running container keeps its old env.
-    const envRevision = "migrate-unpooled-2";
+    const envRevision = "migrate-on-start-3";
     const storedRevision = await this.ctx.storage.get<string>("container-env-rev");
     const running = await container.inspect();
     if (storedRevision !== envRevision && running) {

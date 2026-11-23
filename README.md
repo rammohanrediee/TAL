@@ -217,9 +217,15 @@ rotate those with `wrangler secret put <NAME>` or the Cloudflare dashboard, not 
 workflow.
 
 When the database host is a Neon **pooler** URL, also set `DATABASE_URL_UNPOOLED` to the
-direct (non-pooler) Postgres URL. The API container runs `alembic upgrade head` on start;
-DDL through the pooler fails or no-ops, which leaves production missing columns such as
-`conversations.search_context`.
+direct (non-pooler) Postgres URL. Alembic always uses `DATABASE_URL_UNPOOLED` when set
+(DDL through the pooler fails or no-ops).
+
+Cold starts no longer block on migrations: the container starts uvicorn immediately unless
+`MIGRATE_ON_START=true`. The **Deploy Cloudflare Worker** workflow runs
+`alembic upgrade head` before `wrangler deploy` using GitHub secrets `DATABASE_URL` and
+`DATABASE_URL_UNPOOLED` (add both in **Settings → Secrets and variables → Actions**).
+For local Docker or `start-api.sh`, set `MIGRATE_ON_START=true` in `.env` if you want
+migrations before the API listens.
 
 ## Vercel frontend deployment
 
