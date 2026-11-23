@@ -15,7 +15,7 @@ import { BriefcaseBusiness, ClipboardList } from "lucide-react";
 import JobsView from "./jobs-view";
 import ApplicationsView from "./applications-view";
 import JobSearchCards, { extractJobSearchFromMessageParts } from "@/components/job-search-cards";
-import { apiFetch } from "@/lib/api";
+import { apiFetch, apiFetchWithTimeout, BOOTSTRAP_REQUEST_TIMEOUT_MS, delay, isTransientHttpStatus } from "@/lib/api";
 import styles from "./chat-workspace.module.css";
 
 type Conversation = { id: string; title: string; created_at: string };
@@ -185,8 +185,10 @@ function ChatSidebar({ items, selected, section, onCreate, onSelect, onRemove, l
   );
 }
 
+const BOOTSTRAP_MAX_ATTEMPTS = 4;
+
 async function conversations(path = "", init?: RequestInit) {
-  const response = await apiFetch(`/backend/api/v1/conversations${path}`, init);
+  const response = await apiFetchWithTimeout(`/backend/api/v1/conversations${path}`, init);
   if (response.status === 401) throw new Error("signed-out");
   if (!response.ok) {
     const data = await response.json().catch(() => ({})) as { code?: string; detail?: string };
@@ -476,6 +478,7 @@ function StartConversationView({ user, onStart }: { user: CurrentUser; onStart: 
 export default function ChatWorkspace({ host, section = "chat" }: { host: string; section?: "chat" | "jobs" | "applications" }) {
   const [user, setUser] = useState<CurrentUser | null>(null);
   const [authState, setAuthState] = useState<"checking" | "signed-out" | "unavailable" | "signed-in">("checking");
+  const [authHint, setAuthHint] = useState("");
   const [authAttempt, setAuthAttempt] = useState(0);
   const [items, setItems] = useState<Conversation[]>([]);
   const [loading, setLoading] = useState(true);
@@ -491,14 +494,97 @@ export default function ChatWorkspace({ host, section = "chat" }: { host: string
 
   useEffect(() => {
     const controller = new AbortController();
-    apiFetch("/backend/api/v1/auth/me", { signal: controller.signal })
-      .then(async (response) => {
-        if (response.status === 401) { setAuthState("signed-out"); return; }
-        if (!response.ok) throw new Error("Could not check sign-in status");
-        setUser(await response.json() as CurrentUser);
-        setAuthState("signed-in");
-      })
-      .catch(() => { if (!controller.signal.aborted) setAuthState("unavailable"); });
+
+    async function bootstrap() {
+      setAuthHint("");
+      setLoading(true);
+      setSidebarError(false);
+      let signedOut = false;
+      let startupLikely = false;
+
+      const finishUnavailable = () => {
+        setAuthHint(
+          startupLikely
+            ? "The API can be slow to wake after idle time. Check your connection or retry."
+            : "Check your connection and try again.",
+        );
+        setUser(null);
+        setAuthState("unavailable");
+        setLoading(false);
+      };
+
+      for (let attempt = 0; attempt < BOOTSTRAP_MAX_ATTEMPTS; attempt++) {
+        if (controller.signal.aborted) return;
+        if (attempt > 0) {
+          setAuthHint("TAL is still starting up. This can take a moment after idle time.");
+          await delay(600 * attempt, controller.signal);
+        }
+
+        try {
+          const [meResponse, conversationsResponse] = await Promise.all([
+            apiFetchWithTimeout("/backend/api/v1/auth/me", {
+              signal: controller.signal,
+              timeoutMs: BOOTSTRAP_REQUEST_TIMEOUT_MS,
+            }),
+            apiFetchWithTimeout("/backend/api/v1/conversations", {
+              signal: controller.signal,
+              timeoutMs: BOOTSTRAP_REQUEST_TIMEOUT_MS,
+            }),
+          ]);
+
+          if (meResponse.status === 401 || conversationsResponse.status === 401) {
+            signedOut = true;
+            break;
+          }
+
+          if (!meResponse.ok) {
+            startupLikely ||= isTransientHttpStatus(meResponse.status);
+            if (isTransientHttpStatus(meResponse.status) && attempt < BOOTSTRAP_MAX_ATTEMPTS - 1) {
+              continue;
+            }
+            throw new Error(`auth/me ${meResponse.status}`);
+          }
+
+          const nextUser = await meResponse.json() as CurrentUser;
+          setUser(nextUser);
+          setAuthState("signed-in");
+          setAuthHint("");
+
+          if (conversationsResponse.ok) {
+            setItems(await conversationsResponse.json() as Conversation[]);
+            setLoading(false);
+            return;
+          }
+
+          if (isTransientHttpStatus(conversationsResponse.status)) {
+            startupLikely = true;
+            if (attempt < BOOTSTRAP_MAX_ATTEMPTS - 1) continue;
+          }
+
+          setSidebarError(true);
+          setLoading(false);
+          return;
+        } catch (failure) {
+          if (controller.signal.aborted) return;
+          if (failure instanceof DOMException && failure.name === "AbortError") return;
+          startupLikely = true;
+          if (attempt < BOOTSTRAP_MAX_ATTEMPTS - 1) continue;
+          finishUnavailable();
+          return;
+        }
+      }
+
+      if (controller.signal.aborted) return;
+      if (signedOut) {
+        setUser(null);
+        setAuthState("signed-out");
+        setLoading(false);
+        return;
+      }
+      finishUnavailable();
+    }
+
+    void bootstrap();
     return () => controller.abort();
   }, [authAttempt]);
 
@@ -515,11 +601,6 @@ export default function ChatWorkspace({ host, section = "chat" }: { host: string
       setLoading(false);
     }
   }
-
-  useEffect(() => {
-    if (!user) return;
-    queueMicrotask(() => { void loadConversations(); });
-  }, [user]);
 
   async function start(text = "", file: File | null = null): Promise<boolean> {
     try {
@@ -572,9 +653,17 @@ export default function ChatWorkspace({ host, section = "chat" }: { host: string
         <div className={styles.authDialog} role="dialog" aria-label="Sign in to TAL">
           <p className={styles.eyebrow}>TAL / {section === "jobs" ? "Jobs" : section === "applications" ? "Applications" : "Chat"}</p>
           <h1>{authState === "checking" ? "Checking your account…" : authState === "unavailable" ? "We couldn’t reach TAL." : "Please sign in."}</h1>
-          <p>{authState === "checking" ? "Your workspace will appear in a moment." : authState === "unavailable" ? "Check your connection and try again." : section === "jobs" ? "Sign in to watch company boards and see open jobs." : section === "applications" ? "Sign in to manage your applications." : "Sign in to see your conversations and start a new chat."}</p>
+          <p>{authState === "checking"
+            ? (authHint || "Your workspace will appear in a moment.")
+            : authState === "unavailable"
+              ? (authHint || "Check your connection and try again.")
+              : section === "jobs"
+                ? "Sign in to watch company boards and see open jobs."
+                : section === "applications"
+                  ? "Sign in to manage your applications."
+                  : "Sign in to see your conversations and start a new chat."}</p>
           {authState === "signed-out" && <Link href="/login" className={styles.signInButton}>Sign in <ArrowRight aria-hidden="true" size={18} /></Link>}
-          {authState === "unavailable" && <button type="button" className={styles.signInButton} onClick={() => { setAuthState("checking"); setAuthAttempt((attempt) => attempt + 1); }}>Retry <ArrowRight aria-hidden="true" size={18} /></button>}
+          {authState === "unavailable" && <button type="button" className={styles.signInButton} onClick={() => { setAuthHint(""); setAuthState("checking"); setAuthAttempt((attempt) => attempt + 1); }}>Retry <ArrowRight aria-hidden="true" size={18} /></button>}
         </div>
       </main>
     );

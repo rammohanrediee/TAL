@@ -230,17 +230,25 @@ export class TalContainer extends DurableObject<Env> {
   private starting?: Promise<void>;
 
   async fetch(request: Request): Promise<Response> {
-    this.starting ??= this.startAndWaitForHealth().finally(() => {
-      this.starting = undefined;
-    });
-    await this.starting;
+    try {
+      this.starting ??= this.startAndWaitForHealth().finally(() => {
+        this.starting = undefined;
+      });
+      await this.starting;
 
-    const url = new URL(request.url);
-    url.protocol = "http:";
-    url.host = "container";
-    const forwarded = new Request(url, request);
-    forwarded.headers.delete("host");
-    return this.ctx.container!.getTcpPort(PORT).fetch(forwarded);
+      const url = new URL(request.url);
+      url.protocol = "http:";
+      url.host = "container";
+      const forwarded = new Request(url, request);
+      forwarded.headers.delete("host");
+      return this.ctx.container!.getTcpPort(PORT).fetch(forwarded);
+    } catch (error) {
+      console.error("TAL API container unavailable", error);
+      return Response.json(
+        { detail: "TAL is still starting up. Try again in a moment." },
+        { status: 503 },
+      );
+    }
   }
 
   private async startAndWaitForHealth(): Promise<void> {
