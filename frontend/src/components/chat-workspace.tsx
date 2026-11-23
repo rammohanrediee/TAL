@@ -201,6 +201,7 @@ function TalComposer(props: {
   id: string;
   onSend: (text: string, file: File | null) => Promise<void>;
   disabled?: boolean;
+  connecting?: boolean;
   attachedName?: string;
 }) {
   return <TalChatComposer {...props} />;
@@ -277,6 +278,7 @@ function ConnectedConversationView({
             <p className={styles.eyebrow}>A place to start</p>
             <h2>What would you like to work through?</h2>
             <p>Ask about your job search. Attach a résumé when you want an answer grounded in your experience.</p>
+            <p className={styles.trustLine}>Fit scores reflect résumé evidence, not hiring odds.</p>
             <ul className={styles.suggestedPrompts} aria-label="Suggested job-search prompts">
               {JOB_SEARCH_STARTERS.map((text) => (
                 <li key={text}>
@@ -299,11 +301,12 @@ function ConnectedConversationView({
             : null;
           const bodyText = textFromMessage(message);
           const anchorToEnd = index === messages.length - 1;
+          const scrollAnchor = anchorToEnd || Boolean(jobResults);
           return (
           <MessageScrollerItem
             key={message.id}
             messageId={message.id}
-            scrollAnchor={anchorToEnd}
+            scrollAnchor={scrollAnchor}
             className={styles.messageScrollItem}
           >
             <Message align={message.role === "user" ? "end" : "start"}>
@@ -342,7 +345,13 @@ function ConnectedConversationView({
           TAL could not reply. {chatError instanceof Error ? chatError.message : "Try sending your message again."}
         </p>
       )}
-      <TalComposer id="chat-message" onSend={send} disabled={!connected || status !== "ready"} attachedName={attachment} />
+      <TalComposer
+        id="chat-message"
+        onSend={send}
+        disabled={!connected || status !== "ready"}
+        connecting={!connected || status !== "ready"}
+        attachedName={attachment}
+      />
     </div>
   );
 }
@@ -445,6 +454,7 @@ function StartConversationView({ user, onStart }: { user: CurrentUser; onStart: 
       <div className={styles.noConversation}>
         <h1>{heroTitle}</h1>
         <p>Ask TAL about your job search, or attach a résumé for an answer grounded in your experience.</p>
+        <p className={styles.trustLine}>Fit scores reflect résumé evidence, not hiring odds.</p>
       </div>
       <ul className={styles.suggestedPrompts} aria-label="Suggested job-search prompts">
         {JOB_SEARCH_STARTERS.map((text) => (

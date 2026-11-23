@@ -40,26 +40,48 @@ export default function JobSearchCards({ jobs }: { jobs: JobFitCard[] }) {
                   {job.work_mode ? ` · ${job.work_mode}` : ""}
                 </p>
               </div>
-              <span className="shrink-0 rounded-full bg-tal-yellow px-2 py-0.5 text-xs font-black text-tal-ink">
+              <span
+                className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-black ${
+                  job.validation_status === "thin_description"
+                    ? "bg-tal-warning-soft text-tal-warning"
+                    : "bg-tal-yellow text-tal-ink"
+                }`}
+              >
                 {formatFit(job.fit_score)}
               </span>
             </div>
             {job.matched_skills.length > 0 && (
-              <p className="mt-2 text-xs text-tal-secondary">
-                Skills: {job.matched_skills.slice(0, 6).join(", ")}
-              </p>
+              <ul className="mt-2 flex flex-wrap gap-1.5" aria-label="Matched skills">
+                {job.matched_skills.slice(0, 6).map((skill) => (
+                  <li key={skill}>
+                    <span className="rounded-full border border-tal-border bg-tal-subtle px-2 py-0.5 text-xs font-semibold text-tal-secondary">
+                      {skill}
+                    </span>
+                  </li>
+                ))}
+              </ul>
             )}
             {job.validation_status === "thin_description" && (
               <p className="mt-1 text-xs text-tal-muted">Limited job description — score capped.</p>
             )}
-            <a
-              href={job.apply_url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="mt-2 inline-flex items-center gap-1 text-sm font-bold text-tal-ink hover:underline"
-            >
-              Apply <ArrowUpRight size={14} aria-hidden />
-            </a>
+            <div className="mt-2 flex flex-wrap items-center gap-4">
+              <a
+                href={job.apply_url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1 text-sm font-bold text-tal-ink hover:underline"
+              >
+                Apply <ArrowUpRight size={14} aria-hidden />
+              </a>
+              <a
+                href={job.job_url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-sm font-semibold text-tal-secondary hover:text-tal-ink hover:underline"
+              >
+                View posting
+              </a>
+            </div>
           </li>
         ))}
       </ul>

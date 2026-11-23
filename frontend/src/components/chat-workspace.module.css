@@ -95,9 +95,32 @@
 .conversationHeader { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 22px clamp(18px, 5vw, 60px); border-bottom: 1px solid var(--chat-border); background: var(--chat-surface); }
 .conversationHeader h1 { font-size: clamp(22px, 2.4vw, 30px); font-weight: 850; letter-spacing: -.035em; line-height: 1.1; }
 .eyebrow { margin-bottom: 5px; color: var(--chat-secondary); font-size: 12px; font-weight: 700; letter-spacing: .02em; }
-.connectionStatus { flex: none; color: var(--chat-muted); font-size: 12px; font-weight: 700; }
+.connectionStatus {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  min-height: 26px;
+  padding: 4px 10px;
+  border: 1px solid var(--chat-border);
+  border-radius: 999px;
+  background: var(--chat-subtle);
+  color: var(--chat-secondary);
+  font-size: 11px;
+  font-weight: 750;
+  letter-spacing: .01em;
+  white-space: nowrap;
+}
 .connectionStatus::before { display: inline-block; width: 7px; height: 7px; margin-right: 8px; border-radius: 50%; background: var(--chat-muted); content: ""; }
+.connectionStatus[data-connected="true"] { border-color: color-mix(in srgb, var(--tal-green) 35%, var(--chat-border)); background: var(--tal-green-soft); color: var(--tal-green); }
 .connectionStatus[data-connected="true"]::before { background: var(--tal-green); }
+.trustLine { margin-top: 10px; color: var(--chat-muted); font-size: 13px; font-weight: 600; line-height: 1.5; }
+.emptyState .trustLine { margin-top: 8px; }
+.resumeChip { display: inline-flex; max-width: min(100%, 320px); align-items: center; gap: 6px; padding: 4px 6px 4px 10px; border: 1px solid var(--chat-border); border-radius: 999px; background: var(--chat-surface); color: var(--chat-ink); font-size: 12px; font-weight: 650; }
+.resumeChipLabel { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.resumeChipRemove { display: grid; width: 26px; height: 26px; flex: none; place-items: center; border-radius: 999px; color: var(--chat-secondary); }
+.resumeChipRemove:hover:not(:disabled) { background: var(--chat-subtle); color: var(--chat-ink); }
+.resumeChipRemove:focus-visible { outline: 2px solid var(--chat-accent); outline-offset: 2px; }
+.resumeChipRemove:disabled { opacity: .5; cursor: not-allowed; }
 .scroller { width: 100%; height: auto; min-height: 0; flex: 1; }
 .thread { max-width: 880px; min-height: min(100%, auto); margin: 0 auto; padding: 24px 28px 32px; }
 .messageScrollItem { content-visibility: visible; contain-intrinsic-size: auto; }

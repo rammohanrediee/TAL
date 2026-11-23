@@ -5,7 +5,7 @@ import { ChatComposer, ChatComposerDrawer, ChatSendButton } from "@astryxdesign/
 import { Button } from "@astryxdesign/core/Button";
 import { Icon } from "@astryxdesign/core/Icon";
 import { Text } from "@astryxdesign/core/Text";
-import { PaperClipIcon } from "@heroicons/react/24/outline";
+import { PaperClipIcon, XMarkIcon } from "@heroicons/react/24/outline";
 import styles from "./chat-workspace.module.css";
 
 const RESUME_ACCEPT = ".pdf,.docx";
@@ -15,6 +15,7 @@ type TalChatComposerProps = {
   id?: string;
   onSend: (text: string, file: File | null) => Promise<void>;
   disabled?: boolean;
+  connecting?: boolean;
   attachedName?: string;
 };
 
@@ -22,6 +23,7 @@ export function TalChatComposer({
   id,
   onSend,
   disabled = false,
+  connecting = false,
   attachedName,
 }: TalChatComposerProps) {
   const [error, setError] = useState("");
@@ -29,6 +31,14 @@ export function TalChatComposer({
   const [resumeFile, setResumeFile] = useState<File | null>(null);
   const fileInputId = useId();
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const clearResume = useCallback(() => {
+    setResumeFile(null);
+    setError("");
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
+  }, []);
 
   const onPickResume = useCallback((file: File | null) => {
     if (!file) {
@@ -69,12 +79,27 @@ export function TalChatComposer({
   const canSend = Boolean(value.trim() || resumeFile) && !disabled;
   const resumeLabel = resumeFile?.name ?? attachedName;
 
+  const resumeChip = resumeLabel ? (
+    <span className={styles.resumeChip}>
+      <span className={styles.resumeChipLabel} title={resumeLabel}>
+        {resumeLabel}
+      </span>
+      <button
+        type="button"
+        className={styles.resumeChipRemove}
+        aria-label="Remove résumé"
+        disabled={disabled}
+        onClick={clearResume}
+      >
+        <Icon icon={XMarkIcon} size="sm" />
+      </button>
+    </span>
+  ) : null;
+
   const drawer =
     resumeLabel ? (
-      <ChatComposerDrawer count={1} label="Résumé">
-        <Text type="supporting" color="secondary">
-          {resumeLabel}
-        </Text>
+      <ChatComposerDrawer count={1} label="Résumé" collapsedSummary={resumeChip}>
+        {resumeChip}
       </ChatComposerDrawer>
     ) : undefined;
 
@@ -108,6 +133,11 @@ export function TalChatComposer({
           onSubmit={performSend}
           placeholder="Ask TAL about a role, your résumé, or your next move…"
           drawer={drawer}
+          headerContext={
+            <Text type="supporting" color="secondary">
+              Enter to send · Shift+Enter for a new line
+            </Text>
+          }
           footerActions={
             <Button
               label="Attach PDF or DOCX résumé"
@@ -119,7 +149,13 @@ export function TalChatComposer({
               onClick={() => fileInputRef.current?.click()}
             />
           }
-          sendButton={<ChatSendButton isDisabled={!canSend} onSend={() => performSend(value)} />}
+          sendButton={
+            connecting && disabled ? (
+              <Button label="Connecting…" variant="secondary" size="md" isDisabled />
+            ) : (
+              <ChatSendButton isDisabled={!canSend} onSend={() => performSend(value)} />
+            )
+          }
         />
       </div>
     </div>
