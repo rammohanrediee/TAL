@@ -3,7 +3,7 @@ from typing import Final
 
 from fastapi import Request, Response
 
-from tal.core.config import settings
+from tal.core.config import get_settings, settings
 
 ACCESS_COOKIE: Final = "tal_access_token"
 CSRF_COOKIE: Final = "tal_csrf"
@@ -86,7 +86,7 @@ def csrf_tokens_match(request: Request) -> bool:
 
 
 def requires_csrf_validation(request: Request) -> bool:
-    if not settings.auth_csrf_enabled:
+    if not get_settings().auth_csrf_enabled:
         return False
     if request.method in SAFE_METHODS:
         return False
