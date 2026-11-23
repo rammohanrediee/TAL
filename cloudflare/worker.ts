@@ -45,7 +45,30 @@ function base64UrlBytes(value: string): Uint8Array {
 }
 
 /** Browsers cannot set custom headers on the WebSocket upgrade; the client sends the JWT via Sec-WebSocket-Protocol instead of the URL. */
+function lastUserText(messages: ReadonlyArray<{ role: string; parts?: ReadonlyArray<{ type?: string; text?: string }> }>): string {
+  for (let index = messages.length - 1; index >= 0; index -= 1) {
+    const message = messages[index];
+    if (message.role !== "user") continue;
+    const text = (message.parts ?? [])
+      .filter((part) => part.type === "text" && typeof part.text === "string")
+      .map((part) => part.text)
+      .join(" ")
+      .trim();
+    if (text) return text;
+  }
+  return "";
+}
+
+function isSmallTalk(text: string): boolean {
+  const normalized = text.trim().toLowerCase();
+  if (!normalized || normalized.length > 80) return false;
+  if (/\b(job|jobs|role|roles|resume|résumé|hiring|python|engineer|opening)\b/.test(normalized)) return false;
+  return /^(hi|hello|hey|yo|thanks|thank you|good (morning|afternoon|evening|night))\b[!?.\s]*$/.test(normalized);
+}
+
 function extractChatToken(request: Request): string | null {
+  const fromQuery = new URL(request.url).searchParams.get("token")?.trim();
+  if (fromQuery) return fromQuery;
   const offered = request.headers.get("Sec-WebSocket-Protocol");
   if (offered) {
     for (const part of offered.split(",")) {
@@ -127,6 +150,7 @@ export class TalChatAgent extends AIChatAgent<Env> {
     const resume = await this.ctx.storage.get<{ filename: string; text: string }>("resume");
     const auth = await this.resolveChatAuth();
     const userId = auth?.sub;
+    const incoming = lastUserText(this.messages);
     const system = [
       "You are TAL, a job-search copilot. Always reply with helpful text to every user message.",
       "Answer greetings, career questions, and job-search requests.",
@@ -182,16 +206,28 @@ export class TalChatAgent extends AIChatAgent<Env> {
       },
     });
 
+    const modelMessages = pruneMessages({
+      messages: await convertToModelMessages(this.messages),
+      toolCalls: "before-last-2-messages",
+    });
+    // Greetings should not wait on job-search tools or the API container.
+    if (isSmallTalk(incoming)) {
+      const greeting = streamText({
+        model: ai(CHAT_MODEL),
+        system: "You are TAL, a job-search copilot. Reply to this greeting in one or two short sentences. Invite the user to ask about roles or attach a résumé. Do not invent jobs.",
+        messages: modelMessages,
+        maxOutputTokens: 120,
+      });
+      return greeting.toUIMessageStreamResponse();
+    }
+
     try {
       const result = streamText({
         model: ai(CHAT_MODEL),
         system,
         tools: { search_jobs: searchJobs, get_profile_summary: profileSummary },
-        stopWhen: isStepCount(5),
-        messages: pruneMessages({
-          messages: await convertToModelMessages(this.messages),
-          toolCalls: "before-last-2-messages",
-        }),
+        stopWhen: isStepCount(3),
+        messages: modelMessages,
         maxOutputTokens: 800,
       });
       return result.toUIMessageStreamResponse();
@@ -359,11 +395,10 @@ export default {
           return new Response("Unauthorized", { status: 401 });
         }
         const url = new URL(candidate.url);
-        if (url.searchParams.has("token")) {
-          url.searchParams.delete("token");
-          return new Request(url, candidate);
-        }
-        return candidate;
+        url.searchParams.delete("token");
+        const headers = new Headers(candidate.headers);
+        headers.set("X-Tal-Chat-Token", token!);
+        return new Request(url, { headers });
       };
       const response = (await routeAgentRequest(request, env, {
         onBeforeConnect: check,

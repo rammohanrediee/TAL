@@ -231,7 +231,7 @@ function ConnectedConversationView({
     agent: "TalChatAgent",
     name: id,
     host: agentHost,
-    protocols: [token],
+    query: { token },
     onOpen: () => setConnected(true),
     onClose: () => setConnected(false),
     onConnectionError: () => onConnectionLost?.(),
